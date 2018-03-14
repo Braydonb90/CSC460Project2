@@ -1,5 +1,6 @@
 #include <string.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <util/delay.h>
 #include "LED_Test.h"
 
@@ -42,6 +43,17 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
 #define BIT_SWAP(PORT, PIN) (PORT ^= (1<<PIN))
 
 
+/*--DEBUG----------------------*/
+
+void debug_set_led(int state){ 
+   BIT_SET(DDRB,4);
+   if(state == 1)
+       BIT_SET(PORTB, 4);
+   else
+       BIT_RESET(PORTB, 4);
+}
+
+
 /*===========
   * RTOS Internal
   *===========
@@ -54,7 +66,7 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
   * context.
   * (See file "switch.S" for details.)
   */
-extern void Enter_Kernel();
+extern void CSwitch();
 
 /* Prototype */
 void Task_Terminate(void);
@@ -122,7 +134,7 @@ volatile static unsigned int Tasks;
 
 /**
  * When creating a new task, it is important to initialize its stack just like
- * it has called "Enter_Kernel()"; so that when we switch to it later, we
+ * it has called "CSwitch()"; so that when we switch to it later, we
  * can just restore its execution context on its stack.
  * (See file "cswitch.S" for details.)
  */
@@ -157,17 +169,8 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
    *(unsigned char *)sp-- = (((unsigned int)f) >> 8) & 0xff;
    *(unsigned char *)sp-- = 0;
 
-#ifdef DEBUG
-   //Fill stack with initial values for development debugging
-   //Registers 0 -> 31 and the status register
-   for (counter = 0; counter < 33; counter++)
-   {
-      *(unsigned char *)sp-- = counter;
-   }
-#else
    //Place stack pointer at top of stack
    sp = sp - 34;
-#endif
       
    p->sp = sp;    /* stack pointer into the "workSpace" */
 
@@ -201,23 +204,26 @@ static void Kernel_Create_Task( voidfuncptr f )
   * This internal kernel function is a part of the "scheduler". It chooses the
   * next task to run, i.e., CurrentP.
   */
-  //Remobed static because it was blocking external access from assembly file cswitch.S.
-  //We desire to see a 'T' not a 't' in the avr-nm output from the object file.
 void Dispatch()
 {
      /* find the next READY task
-       * Note: if there is no READY task, then this will loop forever!.
-       */
+      * Note: if there is no READY task, then this will loop forever!.
+      */
    while(Process[NextP].state != READY) {
       NextP = (NextP + 1) % MAXPROCESS;
    }
 
+
      /* we have a new CurrentP */
    CurrentP = &(Process[NextP]);
    CurrentP->state = RUNNING;
- 
+    
+   int i = 0;
+    
    //Moved to bottom (this was in the wrong place).
    NextP = (NextP + 1) % MAXPROCESS;
+   debug_set_led(0);
+   _delay_ms(1000);
 }
 
 
@@ -225,6 +231,14 @@ void Dispatch()
   * RTOS  API  and Stubs
   *================
   */
+
+/*****
+ *  Prototypes
+ ****/
+
+ void Setup_Timer();
+
+
 
 /**
   * This function initializes the RTOS and must be called before any other
@@ -255,10 +269,12 @@ void OS_Start()
 
       /* here we go...  */
       KernelActive = 1;
-	  Setup_Timer();
+
+      debug_set_led(1);
+      _delay_ms(1000);
+
+      //This shouldn't return here but it do
       Exit_Kernel();
-	  BIT_SET(PORTB, 7);
-	  Enable_Interrupt();
    }
 }
 
@@ -282,8 +298,8 @@ void Task_Next()
 {
    if (KernelActive) {
      Disable_Interrupt();
-     CurrentP ->state = READY;
-     Enter_Kernel();
+     CurrentP->state = READY;
+     CSwitch();
      /* resume here when this task is rescheduled again later */
      Exit_Kernel();
   }
@@ -305,30 +321,33 @@ void Task_Terminate()
 
 void Setup_Timer() 
 {
-	TCCR4A = 0;
-  TCCR4B = 0;  
-  //Set to CTC (mode 4)
-  TCCR4B |= (1<<WGM32);
-  
-  //Set prescaller to 256
-  TCCR4B |= (1<<CS32);
-  
-  //Set TOP value (0.5 seconds)
-  OCR4A = 625;
-  
-  //Enable interupt A for timer 3.
-  TIMSK4 |= (1<<OCIE4A);
-  
-  //Set timer to 0 (optional here).
-  TCNT4 = 0;
+
+    TCCR4A = 0;
+    TCCR4B = 0;  
+    //Set to CTC (mode 4)
+    TCCR4B |= (1<<WGM42);
+
+    //Set prescaller to 256
+    TCCR4B |= (1<<CS42);
+
+    //Set TOP value (0.5 seconds)
+    OCR4A = 32500;
+
+    //Enable interupt A for timer 4.
+    TIMSK4 |= (1<<OCIE4A);
+
+    //Set timer to 0 (optional here).
+    TCNT4 = 0;
   
 }
 
+int state = 0;
 ISR(TIMER4_COMPA_vect)
 {
-	BIT_SET(PORTB, 7);
-	Task_Next();
+	CSwitch();
 }
+
+
 
 
 /*============
@@ -344,19 +363,14 @@ void Ping()
 {
   int  x ;
   //init_LED_D5();
-  BIT_SET(DDRC, 6);
+  BIT_SET(DDRA, 6);
   for(;;){
     //LED on
-  //enable_LED(LED_D5_GREEN);
-    BIT_SET(PORTC, 6);
+    BIT_SET(PORTA, 6);
 
     _delay_ms(2000);
-    BIT_RESET(PORTC, 6);
+    BIT_RESET(PORTA, 6);
     _delay_ms(2000);
-
-  //LED off
-  //disable_LEDs();  
-    /* printf( "*" );  */
   }
 }
 
@@ -367,23 +381,15 @@ void Ping()
   */
 void Pong() 
 {
-  int  x;
-  //init_LED_D2();
-  BIT_SET(DDRC, 7);
-  for(;;) {
-  //LED on
-  //enable_LED(LED_D2_GREEN);
-    BIT_SET(PORTC, 7);
-    _delay_ms(2000);
-    BIT_RESET(PORTC, 7);
-    _delay_ms(2000);
-
-  //LED off
-  //disable_LEDs();S
-	//BIT_RESET(PORTB, 5);
-    /* printf( "." );  */
-  
-  }
+    int  x;
+    BIT_SET(DDRB, 6);
+    for(;;) {
+        //LED on
+        BIT_SET(PORTB, 6);
+        _delay_ms(2000);
+        BIT_RESET(PORTB, 6);
+        _delay_ms(2000);
+    }
 }
 
 
@@ -393,16 +399,16 @@ void Pong()
   */
 int main() 
 {
-	BIT_SET(DDRB, 7);
-	BIT_RESET(PORTB, 7);
-   OS_Init();
-   Task_Create( Pong );
-   Task_Create( Ping );
-   
-   OS_Start();
-   
-   for( ;; );   /* do nothing */
 
-   return 0;
+    OS_Init();
+    Task_Create( Pong );
+    Task_Create( Ping );
+    Setup_Timer();
+
+    OS_Start();
+
+    for( ;; );
+
+    return 0;
 }
 
