@@ -1,5 +1,6 @@
 exercise_7/makefile
 exercise_7/setpath
+exercise_7/build
 *.o
 *.hex
 *.elf
