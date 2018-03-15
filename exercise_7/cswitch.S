@@ -148,10 +148,12 @@ CSwitch:
     * Now, we have saved the CurrentP's context.
     * Save the current H/W stack pointer into CurrentP->sp.
     */
-    in r30, SPL
-    in r31, SPH
-    sts CurrentP, r30       /* store (R28=SPL,R29=SPH) indirectly via Z */
-    sts CurrentP+1, r31       /* Now, CurrentP->sp = the current H/W stack pointer */
+    lds r30, CurrentP
+    lds r31, CurrentP
+    in r28, SPL
+    in r29, SPH
+    st Z+, r28       /* store (R28=SPL,R29=SPH) indirectly via Z */
+    st Z+, r29       /* Now, CurrentP->sp = the current H/W stack pointer */
 
     /*
     * Now, we should select a new "CurrentP".
@@ -167,8 +169,10 @@ Exit_Kernel:
       
     lds  r30, CurrentP
     lds  r31, CurrentP+1    
-    out  SPL, r30 
-    out  SPH, r31           ; Now, H/W stack pointer = CurrentP->sp 
+    ld r28, Z+
+    ld r29, Z+
+    out  SPL, r28 
+    out  SPH, r29           ; Now, H/W stack pointer = CurrentP->sp 
     
     ; We are now executing in our new CurrentP's stack.
     ; Note: at the bottom of the CurrentP's context is its return address.
