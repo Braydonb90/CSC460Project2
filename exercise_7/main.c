@@ -46,12 +46,27 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
 /*--DEBUG----------------------*/
 
 void debug_set_led(int state){ 
-   BIT_SET(DDRB,4);
+   BIT_SET(DDRB,7);
    if(state == 1)
-       BIT_SET(PORTB, 4);
+       BIT_SET(PORTB, 7);
    else
-       BIT_RESET(PORTB, 4);
+       BIT_RESET(PORTB, 7);
 }
+
+//flash led num times
+//function blocks while flashing, only intended for debugging
+void debug_flash_led(int num){
+    int i;
+    int delay = 200; 
+    for(i = 0; i < num; i++){
+        debug_set_led(1);
+        _delay_ms(delay);
+        debug_set_led(0);
+        _delay_ms(delay);
+    }
+}
+
+
 
 
 /*===========
@@ -222,8 +237,6 @@ void Dispatch()
     
    //Moved to bottom (this was in the wrong place).
    NextP = (NextP + 1) % MAXPROCESS;
-   debug_set_led(0);
-   _delay_ms(1000);
 }
 
 
@@ -270,8 +283,6 @@ void OS_Start()
       /* here we go...  */
       KernelActive = 1;
 
-      debug_set_led(1);
-      _delay_ms(1000);
 
       //This shouldn't return here but it do
       Exit_Kernel();
@@ -301,7 +312,7 @@ void Task_Next()
      CurrentP->state = READY;
      CSwitch();
      /* resume here when this task is rescheduled again later */
-     Exit_Kernel();
+     Enable_Interrupt();
   }
 }
 
@@ -311,6 +322,8 @@ void Task_Next()
   */
 void Task_Terminate() 
 {
+   BIT_SET(DDRB, 4);
+   BIT_SET(PORTB, 4);
    if (KernelActive) {
       Disable_Interrupt();
       CurrentP -> state = DEAD;
@@ -331,7 +344,7 @@ void Setup_Timer()
     TCCR4B |= (1<<CS42);
 
     //Set TOP value (0.5 seconds)
-    OCR4A = 32500;
+    OCR4A = 625;
 
     //Enable interupt A for timer 4.
     TIMSK4 |= (1<<OCIE4A);
@@ -344,7 +357,9 @@ void Setup_Timer()
 int state = 0;
 ISR(TIMER4_COMPA_vect)
 {
-	CSwitch();
+  state = !state;
+  debug_set_led(state);
+  Task_Next();
 }
 
 
@@ -361,17 +376,17 @@ ISR(TIMER4_COMPA_vect)
   */
 void Ping() 
 {
-  int  x ;
-  //init_LED_D5();
-  BIT_SET(DDRA, 6);
-  for(;;){
-    //LED on
-    BIT_SET(PORTA, 6);
-
-    _delay_ms(2000);
-    BIT_RESET(PORTA, 6);
-    _delay_ms(2000);
-  }
+    int  x,y;
+    //init_LED_D5();
+    BIT_SET(DDRA, 6);
+    for(;;){
+        //LED on
+        BIT_SET(PORTA, 6);
+        _delay_ms(1000);
+        BIT_RESET(PORTA, 6);
+        _delay_ms(1000);
+       // Task_Next();
+    }
 }
 
 
@@ -381,14 +396,15 @@ void Ping()
   */
 void Pong() 
 {
-    int  x;
+    int  x,y;
     BIT_SET(DDRB, 6);
     for(;;) {
         //LED on
         BIT_SET(PORTB, 6);
-        _delay_ms(2000);
+        _delay_ms(1000);
         BIT_RESET(PORTB, 6);
-        _delay_ms(2000);
+        _delay_ms(1000);
+       // Task_Next();
     }
 }
 
@@ -399,7 +415,6 @@ void Pong()
   */
 int main() 
 {
-
     OS_Init();
     Task_Create( Pong );
     Task_Create( Ping );
