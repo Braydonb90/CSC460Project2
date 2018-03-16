@@ -29,7 +29,7 @@
  */
 
 //Comment out the following line to remove debugging code from compiled version.
-#define DEBUG
+#define DEBUG_LED_PIN 4
 #define VOLUNTARY 0
 
 typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
@@ -42,7 +42,7 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
 
 #define BIT_RESET(PORT, PIN) (PORT &= ~(1<<PIN))
 #define BIT_SET(PORT, PIN)   (PORT |= (1<<PIN))
-#define BIT_SWAP(PORT, PIN) (PORT ^= (1<<PIN))
+#define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
 #define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
 #define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
 
@@ -59,8 +59,10 @@ void debug_set_led(int state){
 }
 int led_state = 0;
 void debug_toggle_led(){
-    led_state = !led_state;
-    debug_set_led(led_state);
+    if(!(DDRB & (1<<DEBUG_LED_PIN)))
+        BIT_SET(DDRB, DEBUG_LED_PIN);
+    
+    BIT_TOGGLE(PORTB, DEBUG_LED_PIN);
 }
 
 void debug_flash_led(int num){
@@ -358,7 +360,7 @@ void Setup_Timer()
     TCCR4B |= (1<<CS42);
 
     //Set TOP value (0.5 seconds)
-    OCR4A = 16000;
+    OCR4A = 3125;
 
     //Enable interupt A for timer 4.
     TIMSK4 |= (1<<OCIE4A);
@@ -370,8 +372,9 @@ void Setup_Timer()
 
 ISR(TIMER4_COMPA_vect)
 {
-//    debug_toggle_led();
-    Task_Next();
+    debug_toggle_led();
+    if(!VOLUNTARY)
+        Task_Next();
 }
 
 
@@ -381,7 +384,6 @@ ISR(TIMER4_COMPA_vect)
   */
 
 /**
-_delay_ms(1000);
   * This function initializes the RTOS and must be called before any other
   * system calls.
   */
@@ -405,7 +407,6 @@ void OS_Init()
   */
 void OS_Start() 
 {   
-   debug_toggle_led();
    if ( (! KernelActive) && (Tasks > 0)) {
        Disable_Interrupt();
       /* we may have to initialize the interrupt vector for Enter_Kernel() here. */
@@ -478,13 +479,9 @@ void Ping()
   for(;;){
 
 	//LED off
-    //BIT_RESET(PORTB, 6);
-    PORTA = 0xff;
-    _delay_ms(500);
+    BIT_TOGGLE(PORTA, 6);
+    _delay_ms(400);
 
-    PORTA = 0;
-    _delay_ms(500);
-	  
     /* printf( "*" );  */
     if(VOLUNTARY)
         Task_Next();
@@ -502,13 +499,8 @@ void Pong()
   BIT_SET(DDRB, 6);
   for(;;) {
 	//LED on
-    //BIT_SET(PORTB, 6);
-    PORTB = 0xff;
-    _delay_ms(500);
-
-    PORTB = 0;
-    _delay_ms(500);
-
+    BIT_TOGGLE(PORTB, 6);
+    _delay_ms(200);
 
     /* printf( "." );  */
     if(VOLUNTARY)
