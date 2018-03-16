@@ -30,6 +30,7 @@
 
 //Comment out the following line to remove debugging code from compiled version.
 #define DEBUG
+#define VOLUNTARY 0
 
 typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
 
@@ -339,6 +340,40 @@ static void Next_Kernel_Request()
     } 
 }
 
+/*================
+ * Interrupt Stuff
+ *================
+ */
+
+
+void Setup_Timer() 
+{
+
+    TCCR4A = 0;
+    TCCR4B = 0;  
+    //Set to CTC (mode 4)
+    TCCR4B |= (1<<WGM42);
+
+    //Set prescaller to 256
+    TCCR4B |= (1<<CS42);
+
+    //Set TOP value (0.5 seconds)
+    OCR4A = 16000;
+
+    //Enable interupt A for timer 4.
+    TIMSK4 |= (1<<OCIE4A);
+
+    //Set timer to 0 (optional here).
+    TCNT4 = 0;
+  
+}
+
+ISR(TIMER4_COMPA_vect)
+{
+//    debug_toggle_led();
+    Task_Next();
+}
+
 
 /*================
   * RTOS  API  and Stubs
@@ -370,6 +405,7 @@ void OS_Init()
   */
 void OS_Start() 
 {   
+   debug_toggle_led();
    if ( (! KernelActive) && (Tasks > 0)) {
        Disable_Interrupt();
       /* we may have to initialize the interrupt vector for Enter_Kernel() here. */
@@ -405,7 +441,6 @@ void Task_Create( voidfuncptr f)
   */
 void Task_Next() 
 {
-   debug_toggle_led();
    if (KernelActive) {
      Disable_Interrupt();
      Cp ->request = NEXT;
@@ -441,19 +476,18 @@ void Ping()
   int  x ;
   BIT_SET(DDRA, 6);
   for(;;){
-  	//LED on
-    BIT_SET(PORTA, 6);
-    _delay_ms(1000);
-
-    for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
 
 	//LED off
-    BIT_RESET(PORTA, 6);
+    //BIT_RESET(PORTB, 6);
+    PORTA = 0xff;
+    _delay_ms(500);
+
+    PORTA = 0;
+    _delay_ms(500);
 	  
     /* printf( "*" );  */
-    Task_Next();
+    if(VOLUNTARY)
+        Task_Next();
   }
 }
 
@@ -468,19 +502,17 @@ void Pong()
   BIT_SET(DDRB, 6);
   for(;;) {
 	//LED on
-    BIT_SET(PORTB, 6);
-    _delay_ms(1000);
+    //BIT_SET(PORTB, 6);
+    PORTB = 0xff;
+    _delay_ms(500);
 
-    for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
+    PORTB = 0;
+    _delay_ms(500);
 
-	//LED off
-    BIT_RESET(PORTB, 6);
 
     /* printf( "." );  */
-    Task_Next();
-	
+    if(VOLUNTARY)
+        Task_Next();
   }
 }
 
@@ -494,6 +526,7 @@ void main()
    OS_Init();
    Task_Create( Pong );
    Task_Create( Ping );
+   Setup_Timer();
    OS_Start();
 }
 
