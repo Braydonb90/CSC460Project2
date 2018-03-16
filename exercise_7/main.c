@@ -41,16 +41,23 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
 #define BIT_RESET(PORT, PIN) (PORT &= ~(1<<PIN))
 #define BIT_SET(PORT, PIN)   (PORT |= (1<<PIN))
 #define BIT_SWAP(PORT, PIN) (PORT ^= (1<<PIN))
+#define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
+#define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
 
 
 /*--DEBUG----------------------*/
 
 void debug_set_led(int state){ 
-   BIT_SET(DDRB,7);
+   BIT_SET(DDRB,4);
    if(state == 1)
-       BIT_SET(PORTB, 7);
+       BIT_SET(PORTB, 4);
    else
-       BIT_RESET(PORTB, 7);
+       BIT_RESET(PORTB, 4);
+}
+int led_state = 0;
+void debug_toggle_led(){
+    led_state = !led_state;
+    debug_set_led(led_state);
 }
 
 //flash led num times
@@ -175,14 +182,14 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
    //second), even though the AT90 is LITTLE ENDIAN machine.
 
    //Store terminate at the bottom of stack to protect against stack underrun.
-   *(unsigned char *)sp-- = ((unsigned int)Task_Terminate) & 0xff;
-   *(unsigned char *)sp-- = (((unsigned int)Task_Terminate) >> 8) & 0xff;
-   *(unsigned char *)sp-- = 0;
+   *(unsigned char *)sp-- = LOW_BYTE(Task_Terminate);
+   *(unsigned char *)sp-- = HIGH_BYTE(Task_Terminate);
+   *(unsigned char *)sp-- = LOW_BYTE(0);
 
    //Place return address of function at bottom of stack
-   *(unsigned char *)sp-- = ((unsigned int)f) & 0xff;
-   *(unsigned char *)sp-- = (((unsigned int)f) >> 8) & 0xff;
-   *(unsigned char *)sp-- = 0;
+   *(unsigned char *)sp-- = LOW_BYTE(f);
+   *(unsigned char *)sp-- = HIGH_BYTE(f);
+   *(unsigned char *)sp-- = LOW_BYTE(0);
 
    //Place stack pointer at top of stack
    sp = sp - 34;
@@ -284,6 +291,8 @@ void OS_Start()
       KernelActive = 1;
 
 
+      debug_toggle_led();
+      _delay_ms(1000);
       //This shouldn't return here but it do
       Exit_Kernel();
    }
@@ -305,14 +314,19 @@ void Task_Create( voidfuncptr f)
 /**
   * The calling task gives up its share of the processor voluntarily.
   */
+void CSwitch_Test(){
+    CSwitch();
+}
 void Task_Next() 
 {
    if (KernelActive) {
      Disable_Interrupt();
      CurrentP->state = READY;
-     CSwitch();
+     BIT_SET(PORTB,4);
+     CSwitch_Test();
      /* resume here when this task is rescheduled again later */
      Enable_Interrupt();
+     BIT_RESET(PORTB,4);
   }
 }
 
@@ -322,8 +336,6 @@ void Task_Next()
   */
 void Task_Terminate() 
 {
-   BIT_SET(DDRB, 4);
-   BIT_SET(PORTB, 4);
    if (KernelActive) {
       Disable_Interrupt();
       CurrentP -> state = DEAD;
@@ -344,7 +356,7 @@ void Setup_Timer()
     TCCR4B |= (1<<CS42);
 
     //Set TOP value (0.5 seconds)
-    OCR4A = 625;
+    OCR4A = 32500;
 
     //Enable interupt A for timer 4.
     TIMSK4 |= (1<<OCIE4A);
@@ -354,11 +366,9 @@ void Setup_Timer()
   
 }
 
-int state = 0;
 ISR(TIMER4_COMPA_vect)
 {
-  state = !state;
-  debug_set_led(state);
+ // debug_toggle_led();
   Task_Next();
 }
 
@@ -376,16 +386,16 @@ ISR(TIMER4_COMPA_vect)
   */
 void Ping() 
 {
+    Enable_Interrupt();
     int  x,y;
-    //init_LED_D5();
     BIT_SET(DDRA, 6);
     for(;;){
         //LED on
         BIT_SET(PORTA, 6);
-        _delay_ms(1000);
+        _delay_ms(500);
+        debug_toggle_led();
         BIT_RESET(PORTA, 6);
-        _delay_ms(1000);
-       // Task_Next();
+        _delay_ms(500);
     }
 }
 
@@ -396,15 +406,15 @@ void Ping()
   */
 void Pong() 
 {
+    Enable_Interrupt();
     int  x,y;
     BIT_SET(DDRB, 6);
     for(;;) {
         //LED on
         BIT_SET(PORTB, 6);
-        _delay_ms(1000);
+        _delay_ms(500);
         BIT_RESET(PORTB, 6);
-        _delay_ms(1000);
-       // Task_Next();
+        _delay_ms(500);
     }
 }
 
