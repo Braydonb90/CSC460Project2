@@ -1,6 +1,6 @@
-makefile
 setpath
 build
+*.conf
 *.o
 *.hex
 *.elf
