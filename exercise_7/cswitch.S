@@ -116,7 +116,7 @@ EIND = 0x3C
 .endm
 
         .section .text
-        .global Enter_Kernel
+        .global CSwitch
         .global Exit_Kernel
         .extern Dispatch
         .extern CurrentP     /* CurrentP->sp is the first entry in CurrentP's descriptor  */
@@ -139,57 +139,44 @@ EIND = 0x3C
   * void CSwitch();
   * void Exit_Kernel(); 
   */
-Enter_Kernel:
-        /* 
-          * Assume I = 0, i.e., all interrupts are disabled.
-          */
-        SAVECTX
-        /* 
-          * Now, we have saved the CurrentP's context.
-          * Save the current H/W stack pointer into CurrentP->sp.
-          */
-        lds  r30, CurrentP
-        lds  r31, CurrentP+1   /* Z = (R31,R30) contains the "sp" */
-        in   r28, SPL
-        in   r29, SPH
-        st   Z+, r28       /* store (R28=SPL,R29=SPH) indirectly via Z */
-        st   Z+, r29       /* Now, CurrentP->sp = the current H/W stack pointer */
-       /*
-         * Now, we should select a new "CurrentP".
-         */
-		 lds r30, KernelSp
-		 lds r31, KernelSp+1
-		 out SPL, r30
-		 out SPH, r31
-		 
-		 RESTORECTX
-		 
-		 ret
+CSwitch:
+    /* 
+    * Assume I = 0, i.e., all interrupts are disabled.
+    */
+    SAVECTX
+    /* 
+    * Now, we have saved the CurrentP's context.
+    * Save the current H/W stack pointer into CurrentP->sp.
+    */
+    lds r30, CurrentP
+    lds r31, CurrentP
+    in r28, SPL
+    in r29, SPH
+    st Z+, r28       /* store (R28=SPL,R29=SPH) indirectly via Z */
+    st Z+, r29       /* Now, CurrentP->sp = the current H/W stack pointer */
+
+    /*
+    * Now, we should select a new "CurrentP".
+    */
+
 		 
 Exit_Kernel:
-        call Dispatch
-		SAVECTX
-		
-		in r30, SPL
-		in r31, SPH
-		sts KernelSp, r30
-		sts KernelSp+1, r31
-		
-		
-        /*
-          * We are now ready to restore a new CurrentP's context, i.e.,
-          * switching the H/W stack pointer to this new CurrentP->sp.
-          */ 
-        lds  r30, CurrentP
-        lds  r31, CurrentP+1  /* Z = (R31,R30) contains the new "sp" */
-        ld   r28, Z+
-        ld   r29, Z+
-        out  SPL, r28
-        out  SPH, r29   /* Now, H/W stack pointer = CurrentP->sp */
-        /*
-          * We are now executing in our new CurrentP's stack.
-          * Note: at the bottom of the CurrentP's context is its return address.
-          */
-        RESTORECTX
-        ret   
+
+    call Dispatch
+    
+    ; We are now ready to restore a new CurrentP's context, i.e.,
+    ; switching the H/W stack pointer to this new CurrentP->sp.
+      
+    lds  r30, CurrentP
+    lds  r31, CurrentP+1    
+    ld r28, Z+
+    ld r29, Z+
+    out  SPL, r28 
+    out  SPH, r29           ; Now, H/W stack pointer = CurrentP->sp 
+    
+    ; We are now executing in our new CurrentP's stack.
+    ; Note: at the bottom of the CurrentP's context is its return address.
+    
+    RESTORECTX
+    reti 
 /* end of CSwitch() */
