@@ -2,9 +2,11 @@
 #define KERNEL_H
 
 #include "common.h"
+#include "process_queue.h"
 
 #define Disable_Interrupt()		asm volatile ("cli"::)
 #define Enable_Interrupt()		asm volatile ("sei"::)
+
 
 /*===========
   * RTOS Internal
@@ -44,4 +46,36 @@ void Task_Terminate(void);
   */ 
 extern void Enter_Kernel();
 
+/**
+ * When creating a new task, it is important to initialize its stack just like
+ * it has called "Enter_Kernel()"; so that when we switch to it later, we
+ * can just restore its execution context on its stack.
+ * (See file "cswitch.S" for details.)
+ */
+void Kernel_Create_Task_At( PD *p, voidfuncptr f ); 
+
+/**
+  *  Create a new task
+  */
+static void Kernel_Create_Task( voidfuncptr f );
+
+/**
+  * This internal kernel function is a part of the "scheduler". It chooses the 
+  * next task to run, i.e., Cp.
+  */
+static void Dispatch();
+
+/**
+  * This internal kernel function is the "main" driving loop of this full-served
+  * model architecture. Basically, on OS_Start(), the kernel repeatedly
+  * requests the next user task's next system call and then invokes the
+  * corresponding kernel function on its behalf.
+  *
+  * This is the main loop of our kernel, called by OS_Start().
+  */
+static void Kernel_Next_Request();
+
+void Setup_System_Clock(); 
+
+void Task_Next(); 
 #endif

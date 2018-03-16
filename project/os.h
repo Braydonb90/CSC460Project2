@@ -2,9 +2,6 @@
 #ifndef _OS_H_  
 #define _OS_H_  
    
-#define MAXTHREAD     16       
-#define WORKSPACE     256   // in bytes, per THREAD
-#define MSECPERTICK   10   // resolution of a system TICK in milliseconds
 
 #ifndef NULL
 #define NULL          0   /* undefined */

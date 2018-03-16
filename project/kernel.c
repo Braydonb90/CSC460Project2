@@ -2,28 +2,11 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
-/**
- */
+#include "kernel.h"
+#include "common.h"
 
-//Comment out the following line to remove debugging code from compiled version.
 #define DEBUG_LED_PIN 4
-#define VOLUNTARY 0
 
-typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
-
-#define WORKSPACE     256
-#define MAXPROCESS   4
-
-
-/****MACROS***********/
-
-#define BIT_RESET(PORT, PIN) (PORT &= ~(1<<PIN))
-#define BIT_SET(PORT, PIN)   (PORT |= (1<<PIN))
-#define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
-#define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
-#define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
-
-/********************/
 
 /*--DEBUG----------------------*/
 
@@ -59,60 +42,12 @@ void debug_flash_led(int num){
   *===========
   */
 
-/**
-  * This internal kernel function is the context switching mechanism.
-  * It is done in a "funny" way in that it consists two halves: the top half
-  * is called "Exit_Kernel()", and the bottom half is called "Enter_Kernel()".
-  * When kernel calls this function, it starts the top half (i.e., exit). Right in
-  * the middle, "Cp" is activated; as a result, Cp is running and the kernel is
-  * suspended in the middle of this function. When Cp makes a system call,
-  * it enters the kernel via the Enter_Kernel() software interrupt into
-  * the middle of this function, where the kernel was suspended.
-  * After executing the bottom half, the context of Cp is saved and the context
-  * of the kernel is restore. Hence, when this function returns, kernel is active
-  * again, but Cp is not running any more. 
-  * (See file "switch.S" for details.)
-  */
-extern void CSwitch();
-extern void Exit_Kernel();    /* this is the same as CSwitch() */
-
-/* Prototype */
-void Task_Terminate(void);
-
-/** 
-  * This external function could be implemented in two ways:
-  *  1) as an external function call, which is called by Kernel API call stubs;
-  *  2) as an inline macro which maps the call into a "software interrupt";
-  *       as for the AVR processor, we could use the external interrupt feature,
-  *       i.e., INT0 pin.
-  *  Note: Interrupts are assumed to be disabled upon calling Enter_Kernel().
-  *     This is the case if it is implemented by software interrupt. However,
-  *     as an external function call, it must be done explicitly. When Enter_Kernel()
-  *     returns, then interrupts will be re-enabled by Enter_Kernel().
-  */ 
-extern void Enter_Kernel();
-
-  
-
-/**
-  * Each task is represented by a process descriptor, which contains all
-  * relevant information about this task. For convenience, we also store
-  * the task's stack, i.e., its workspace, in here.
-  */
-typedef struct ProcessDescriptor 
-{
-   unsigned char *sp;   /* stack pointer into the "workSpace" */
-   unsigned char workSpace[WORKSPACE]; 
-   PROCESS_STATES state;
-   voidfuncptr  code;   /* function to be executed as a task */
-   KERNEL_REQUEST_TYPE request;
-} PD;
 
 /**
   * This table contains ALL process descriptors. It doesn't matter what
   * state a task is in.
   */
-static PD Process[MAXPROCESS];
+static PD Process[MAXTHREAD];
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -145,21 +80,13 @@ volatile static unsigned int KernelActive;
 /** number of tasks created so far */
 volatile static unsigned int Tasks;  
 
-/**
- * When creating a new task, it is important to initialize its stack just like
- * it has called "Enter_Kernel()"; so that when we switch to it later, we
- * can just restore its execution context on its stack.
+/*
  * (See file "cswitch.S" for details.)
  */
 void Kernel_Create_Task_At( PD *p, voidfuncptr f ) 
 {   
    unsigned char *sp;
 
-#ifdef DEBUG
-   int counter = 0;
-#endif
-
-   //Changed -2 to -1 to fix off by one error.
    sp = (unsigned char *) &(p->workSpace[WORKSPACE-1]);
 
    //Clear the contents of the workspace
@@ -172,14 +99,14 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
    //second), even though the AT90 is LITTLE ENDIAN machine.
 
    //Store terminate at the bottom of stack to protect against stack underrun.
-   *(unsigned char *)sp-- = ((unsigned int)Task_Terminate) & 0xff;
-   *(unsigned char *)sp-- = (((unsigned int)Task_Terminate) >> 8) & 0xff;
-   *(unsigned char *)sp-- = 0;
+   *(unsigned char *)sp-- = LOW_BYTE(Task_Terminate);
+   *(unsigned char *)sp-- = HIGH_BYTE(Task_Terminate);
+   *(unsigned char *)sp-- = LOW_BYTE(0);
 
    //Place return address of function at bottom of stack
-   *(unsigned char *)sp-- = ((unsigned int)f) & 0xff;
-   *(unsigned char *)sp-- = (((unsigned int)f) >> 8) & 0xff;
-   *(unsigned char *)sp-- = 0;
+   *(unsigned char *)sp-- = LOW_BYTE(f);
+   *(unsigned char *)sp-- = HIGH_BYTE(f);
+   *(unsigned char *)sp-- = LOW_BYTE(0);
 
    //Place stack pointer at top of stack
    sp = sp - 34;
@@ -187,8 +114,6 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
    p->sp = sp;		/* stack pointer into the "workSpace" */
    p->code = f;		/* function to be executed as a task */
    p->request = NONE;
-
-   /*----END of NEW CODE----*/
 
    p->state = READY;
 
@@ -202,10 +127,10 @@ static void Kernel_Create_Task( voidfuncptr f )
 {
    int x;
 
-   if (Tasks == MAXPROCESS) return;  /* Too many task! */
+   if (Tasks == MAXTHREAD) return;  /* Too many task! */
 
    /* find a DEAD PD that we can use  */
-   for (x = 0; x < MAXPROCESS; x++) {
+   for (x = 0; x < MAXTHREAD; x++) {
        if (Process[x].state == DEAD) break;
    }
 
@@ -225,24 +150,19 @@ static void Dispatch()
        * Note: if there is no READY task, then this will loop forever!.
        */
    while(Process[NextP].state != READY) {
-      NextP = (NextP + 1) % MAXPROCESS;
+      NextP = (NextP + 1) % MAXTHREAD;
    }
 
    Cp = &(Process[NextP]);
    CurrentSp = Cp->sp;
    Cp->state = RUNNING;
 
-   NextP = (NextP + 1) % MAXPROCESS;
+   NextP = (NextP + 1) % MAXTHREAD;
 }
 
-/**
-  * This internal kernel function is the "main" driving loop of this full-served
-  * model architecture. Basically, on OS_Start(), the kernel repeatedly
-  * requests the next user task's next system call and then invokes the
-  * corresponding kernel function on its behalf.
-  *
-  * This is the main loop of our kernel, called by OS_Start().
-  */
+/*
+ * This is the main loop of our kernel, called by OS_Start().
+ */
 static void Kernel_Next_Request() 
 {
    Dispatch();  /* select a new task to run */
@@ -298,8 +218,8 @@ void Setup_System_Clock()
     //Set prescaler to 256 (16000000 / 256 = 62500)
     TCCR4B |= (1<<CS42);
 
-    //Set TOP value (0.1 seconds)
-    OCR4A = 6250;
+    //Set TOP value (0.01 seconds)
+    OCR4A = (int)(62500 * ((float)MSECPERTICK / 1000));
 
     //Enable interupt A for timer 4.
     TIMSK4 |= (1<<OCIE4A);
@@ -333,7 +253,7 @@ void OS_Init()
    KernelActive = 0;
    NextP = 0;
 	//Reminder: Clear the memory for the task on creation.
-   for (x = 0; x < MAXPROCESS; x++) {
+   for (x = 0; x < MAXTHREAD; x++) {
       memset(&(Process[x]),0,sizeof(PD));
       Process[x].state = DEAD;
    }
@@ -351,17 +271,12 @@ void OS_Start()
 
       /* here we go...  */
       KernelActive = 1;
-      Next_Kernel_Request();
+      Kernel_Next_Request();
       /* NEVER RETURNS!!! */
    }
 }
 
 
-/**
-  * For this example, we only support cooperatively multitasking, i.e.,
-  * each task gives up its share of the processor voluntarily by calling
-  * Task_Next().
-  */
 void Task_Create( voidfuncptr f)
 {
    if (KernelActive ) {
@@ -408,9 +323,8 @@ void Task_Terminate()
 
 /**
   * A cooperative "Ping" task.
-  * Added testing code for LEDs.
   */
-void Ping() 
+void Task_Ping() 
 {
   int  x ;
   BIT_SET(DDRA, 6);
@@ -423,18 +337,15 @@ void Ping()
     BIT_RESET(PORTA, 6);
     _delay_ms(400);
 	  
-    /* printf( "*" );  */
-    if(VOLUNTARY)
-        Task_Next();
+    Task_Next();
   }
 }
 
 
 /**
   * A cooperative "Pong" task.
-  * Added testing code for LEDs.
   */
-void Pong() 
+void Task_Pong() 
 {
   int  x;
   BIT_SET(DDRB, 6);
@@ -446,9 +357,7 @@ void Pong()
     BIT_RESET(PORTB, 6);
     _delay_ms(200);
 
-    /* printf( "." );  */
-    if(VOLUNTARY)
-        Task_Next();
+    Task_Next();
   }
 }
 
@@ -460,7 +369,9 @@ void Pong()
 void main() 
 {
    OS_Init();
-   Setup_Timer();
+   Setup_System_Clock();
+   Task_Create(Task_Pong);
+   Task_Create(Task_Ping);
    OS_Start();
 }
 
