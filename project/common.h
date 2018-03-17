@@ -36,7 +36,9 @@ typedef enum process_state
  */
 typedef enum error_code {
     INVALID_REQUEST = 1,
-    INVALID_PRIORITY,
+    INVALID_PRIORITY_CREATE,
+    INVALID_PRIORITY_DISPATCH,
+    INVALID_TERMINATE,
     NO_DEAD_PDS
 } ERROR_CODE;    
 /*
@@ -80,11 +82,11 @@ typedef struct kernel_request_param
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
 #define MSECPERTICK   100   // resolution of a system TICK in milliseconds
-#define BLINKDELAY 200
+#define BLINKDELAY 100
 
 //shouldn't matter that these are the same
 #define ERROR_PIN 4
-#define CLOCK_PIN 4
+#define CLOCK_PIN 5
 
 #ifndef NULL
 #define NULL          0   /* undefined */
