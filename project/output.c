@@ -1,5 +1,9 @@
 #include "output.h"
 
+/*
+ * Internal function used in both of the other debug_ functions
+ */
+static void debug_blink_array(int count, int* arr); 
 
 void Blink_Pin(unsigned int pin, unsigned int num){
     int i;

@@ -25,9 +25,5 @@ void debug_break(int argcount, ...);
  */
 void debug_blink(int argcount, ...); 
 
-/*
- * Internal function used in both of the other debug_ functions
- */
-static void debug_blink_array(int count, int* arr); 
 
 #endif
