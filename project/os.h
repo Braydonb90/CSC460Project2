@@ -4,17 +4,13 @@
 #include "common.h"
 #include "process_queue.h"
 #include "kernel.h"
+#include "output.h"
 
 /* Aborts the RTOS and enters a "non-executing" state with an error code. That is, all tasks
  * will be stopped.
  */
 void OS_Abort(unsigned int error);
 
-/*
- * Blink specified pin num times. Used for debugging and error codes
- * Currently assumes pin is on port B
- */
-void Blink_Pin(unsigned int pin, unsigned int num);
 
 /*
  * Initializes queues and stuff

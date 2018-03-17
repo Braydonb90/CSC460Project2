@@ -8,19 +8,6 @@ void OS_Abort(unsigned int error) {
     }
 }
 
-/*
- * Blink specified pin num times. Used for debugging and error codes
- * Currently assumes pin is on port B
- */
-void Blink_Pin(unsigned int pin, unsigned int num){
-    int i;
-    for(i = 0; i < num; i++){
-        BIT_SET(PORTB, pin);
-        _delay_ms(BLINKDELAY);
-        BIT_RESET(PORTB, pin);
-        _delay_ms(BLINKDELAY);
-    }
-}
 
 void OS_Init(void) {
     
@@ -45,7 +32,7 @@ PID   Task_Create_RR(voidfuncptr f, int arg) {
     prm.code = f;
     prm.arg = arg;
 
-    Kernel_Request(&prm);
+    Kernel_Request(prm);
     return prm.pid;
 }
 
@@ -63,13 +50,13 @@ void Task_Next()
 {
     KERNEL_REQUEST_PARAM prm;
     prm.request_type = NEXT;
-    Kernel_Request(&prm);
+    Kernel_Request(prm);
 }
 
 void Task_Terminate(void) {
     KERNEL_REQUEST_PARAM prm;
     prm.request_type = TERMINATE;
-    Kernel_Request(&prm);
+    Kernel_Request(prm);
 }
 
 /*
