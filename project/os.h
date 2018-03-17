@@ -1,25 +1,18 @@
-/* Last modified: MHMC Jan/30/2018 */
 #ifndef _OS_H_  
 #define _OS_H_  
-   
 
-#ifndef NULL
-#define NULL          0   /* undefined */
-#endif
-#define TRUE          1
-#define FALSE         0
+#include "common.h"
+#include "process_queue.h"
 
-#define ANY           0xFF       // a mask for ALL message type
-
-typedef unsigned int PID;        // always non-zero if it is valid
-typedef unsigned int TICK;       // 1 TICK is defined by MSECPERTICK
-typedef unsigned int BOOL;       // TRUE or FALSE
-typedef unsigned char MTYPE;
-typedef unsigned char MASK; 
-
-// Aborts the RTOS and enters a "non-executing" state with an error code. That is, all tasks
-// will be stopped.
+/* Aborts the RTOS and enters a "non-executing" state with an error code. That is, all tasks
+ * will be stopped.
+ */
 void OS_Abort(unsigned int error);
+
+/*
+ * Initializes queues and stuff
+ */
+void OS_Init(void);
 
 /*
  * Scheduling Policy:
@@ -46,22 +39,22 @@ void OS_Abort(unsigned int error);
 PID   Task_Create_System(void (*f)(void), int arg);
 PID   Task_Create_RR(    void (*f)(void), int arg);
 
- /**
-   * f a parameterless function to be created as a process instance
-   * arg an integer argument to be assigned to this process instanace
-   * period its execution period in multiples of TICKs
-   * wcet its worst-case execution time in TICKs, must be less than "period"
-   * offset its start time in TICKs
-   * returns 0 if not successful; otherwise a non-zero PID.
-   */
+/*
+ * f a parameterless function to be created as a process instance
+ * arg an integer argument to be assigned to this process instanace
+ * period its execution period in multiples of TICKs
+ * wcet its worst-case execution time in TICKs, must be less than "period"
+ * offset its start time in TICKs
+ * returns 0 if not successful; otherwise a non-zero PID.
+ */
 PID   Task_Create_Period(void (*f)(void), int arg, TICK period, TICK wcet, TICK offset);
 
-// NOTE: When a task function returns, it terminates automatically!!
-
-// When a Periodic ask calls Task_Next(), it will resume at the beginning of its next period.
-// When a RR or System task calls Task_Next(), it voluntarily gives up execution and 
-// re-enters the ready state. All RR and Systems tasks are first-come-first-served.
-//   
+/* NOTE: When a task function returns, it terminates automatically!!
+ *
+ * When a Periodic ask calls Task_Next(), it will resume at the beginning of its next period.
+ * When a RR or System task calls Task_Next(), it voluntarily gives up execution and 
+ * re-enters the ready state. All RR and Systems tasks are first-come-first-served.
+ */   
 void Task_Next(void);
 
 
@@ -73,49 +66,49 @@ int  Task_GetArg(void);
 PID  Task_Pid(void);
 
 
-//
-// Send-Recv-Rply is similar to QNX-style message-passing
-// Rply() to a NULL process is a no-op.
-// See: http://www.qnx.com/developers/docs/6.5.0/index.jsp?topic=%2Fcom.qnx.doc.neutrino_sys_arch%2Fipc.html
-//
-// Note: PERIODIC tasks are not allowed to use Msg_Send() or Msg_Recv().
-//
+/*
+ * Send-Recv-Rply is similar to QNX-style message-passing
+ * Rply() to a NULL process is a no-op.
+ * See: http://www.qnx.com/developers/docs/6.5.0/index.jsp?topic=%2Fcom.qnx.doc.neutrino_sys_arch%2Fipc.html
+ *
+ * Note: PERIODIC tasks are not allowed to use Msg_Send() or Msg_Recv().
+ */
 void Msg_Send( PID  id, MTYPE t, unsigned int *v );
 PID  Msg_Recv( MASK m,           unsigned int *v );
 void Msg_Rply( PID  id,          unsigned int r );
 
-//
-// Asychronously Send a message "v" of type "t" to "id". The task "id" must be blocked on
-// Recv() state, otherwise it is a no-op. After passing "v" to "id", the returned PID of
-// Recv() is NULL (non-existent); thus, "id" doesn't need to reply to this message.
-// Note: The message type "t" must satisfy the MASK "m" imposed by "id". If not, then it
-// is a no-op.
-//
-// Note: PERIODIC tasks (or interrupt handlers), however, may use Msg_ASend()!!!
-//
+/*
+ * Asychronously Send a message "v" of type "t" to "id". The task "id" must be blocked on
+ * Recv() state, otherwise it is a no-op. After passing "v" to "id", the returned PID of
+ * Recv() is NULL (non-existent); thus, "id" doesn't need to reply to this message.
+ * Note: The message type "t" must satisfy the MASK "m" imposed by "id". If not, then it
+ * is a no-op.
+ *
+ * Note: PERIODIC tasks (or interrupt handlers), however, may use Msg_ASend()!!!
+ */
 void Msg_ASend( PID  id, MTYPE t, unsigned int v );
 
 
 
-/**  
-  * Returns the number of milliseconds since OS_Init(). Note that this number
-  * wraps around after it overflows as an unsigned integer. The arithmetic
-  * of 2's complement will take care of this wrap-around behaviour if you use
-  * this number correctly.
-  * Let  T = Now() and we want to know when Now() reaches T+1000.
-  * Now() is always increasing. Even if Now() wraps around, (Now() - T) always
-  * >= 0. As long as the duration of interest is less than the wrap-around time,
-  * then (Now() - T >= 1000) would mean we have reached T+1000.
-  * However, we cannot compare Now() against T directly due to this wrap-around
-  * behaviour.
-  * Now() will wrap around every 65536 milliseconds. Therefore, for measurement
-  * purposes, it should be used for durations less than 65 seconds.
-  */
+/*  
+ * Returns the number of milliseconds since OS_Init(). Note that this number
+ * wraps around after it overflows as an unsigned integer. The arithmetic
+ * of 2's complement will take care of this wrap-around behaviour if you use
+ * this number correctly.
+ * Let  T = Now() and we want to know when Now() reaches T+1000.
+ * Now() is always increasing. Even if Now() wraps around, (Now() - T) always
+ * >= 0. As long as the duration of interest is less than the wrap-around time,
+ * then (Now() - T >= 1000) would mean we have reached T+1000.
+ * However, we cannot compare Now() against T directly due to this wrap-around
+ * behaviour.
+ * Now() will wrap around every 65536 milliseconds. Therefore, for measurement
+ * purposes, it should be used for durations less than 65 seconds.
+ */
 unsigned int Now();  // number of milliseconds since the RTOS boots.
 
 
 
-/**
+/*
  * Booting:
  *  The RTOS and the main application are compiled into a single executable binary, but
  *  otherwise they are totally independent.

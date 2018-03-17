@@ -1,30 +1,64 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <util/delay.h>
 
 /****TYPEDEFS*********/
-/*
-  *  This is the set of states that a task can be in at any given time.
-  */
-typedef enum process_states 
-{ 
-   DEAD = 0, 
-   READY, 
-   RUNNING 
-} PROCESS_STATES;
+typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
+typedef unsigned int PID;        // always non-zero if it is valid
+typedef unsigned int TICK;       // 1 TICK is defined by MSECPERTICK
+typedef unsigned int BOOL;       // TRUE or FALSE
+typedef unsigned char MTYPE;
+typedef unsigned char MASK; 
 
-/**
-  * This is the set of kernel requests, i.e., a request code for each system call.
-  */
+/*
+ * This is the set of priorities that a task can be scheduled with
+ */
+typedef enum priority {
+    SYSTEM = 0,
+    PERIODIC,
+    RR
+} PRIORITY;
+
+/*
+ * This is the set of states that a task can be in at any given time.
+ */
+typedef enum process_state 
+{ 
+    DEAD = 0, 
+    READY, 
+    RUNNING 
+} PROCESS_STATE;
+
+/*
+ * Set of possible errors. These are sent to OS_Abort
+ */
+typedef enum error_code {
+    INVALID_REQUEST = 1,
+    NO_DEAD_PDS
+} ERROR_CODE;    
+/*
+ * This is the set of kernel requests, i.e., a request code for each system call.
+ */
 typedef enum kernel_request_type 
 {
-   NONE = 0,
-   CREATE,
-   NEXT,
-   TERMINATE
+    NONE = 0,
+    CREATE,
+    NEXT,
+    TERMINATE
 } KERNEL_REQUEST_TYPE;
 
-typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
+/* 
+ * to pass info between kernel and tasks 
+ */
+typedef struct kernel_request_param 
+{
+    PID pid;                            //PID returned by kernel on creation etc.
+    KERNEL_REQUEST_TYPE request_type;   //type of request
+    voidfuncptr code;                    //code associated with process
+    PRIORITY priority;
+    int arg;    
+} KERNEL_REQUEST_PARAM;
 
 /*********************/
 
@@ -43,6 +77,34 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
 #define MSECPERTICK   10   // resolution of a system TICK in milliseconds
+#define BLINKDELAY 200
+#define ERROR_PIN 4
+
+#ifndef NULL
+#define NULL          0   /* undefined */
+#endif
+#define TRUE          1
+#define FALSE         0
+
+#define ANY           0xFF       // a mask for ALL message type
+
+/**********************/
+
+/****FUNCTIONS*********/
+
+/*
+ * Blink specified pin num times. Used for debugging and error codes
+ * Currently assumes pin is on port B
+ */
+void Blink_Pin(unsigned int pin, unsigned int num){
+    int i;
+    for(i = 0; i < num; i++){
+        BIT_SET(PORTB, pin);
+        _delay_ms(BLINKDELAY);
+        BIT_RESET(PORTB, pin);
+        _delay_ms(BLINKDELAY);
+    }
+}
 
 /**********************/
 

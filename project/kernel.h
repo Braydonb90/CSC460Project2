@@ -3,9 +3,15 @@
 
 #include "common.h"
 #include "process_queue.h"
+#include "os.h"
 
 #define Disable_Interrupt()		asm volatile ("cli"::)
 #define Enable_Interrupt()		asm volatile ("sei"::)
+
+/*
+ * external "main" function. first task to run, and should initialize the starting tasks
+ */
+extern void user_main();
 
 
 /*===========
@@ -57,7 +63,7 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f );
 /**
   *  Create a new task
   */
-static void Kernel_Create_Task( voidfuncptr f );
+static void Kernel_Create_Task();
 
 /**
   * This internal kernel function is a part of the "scheduler". It chooses the 
@@ -67,15 +73,26 @@ static void Dispatch();
 
 /**
   * This internal kernel function is the "main" driving loop of this full-served
-  * model architecture. Basically, on OS_Start(), the kernel repeatedly
+  * model architecture. Basically, on Kernel_Start(), the kernel repeatedly
   * requests the next user task's next system call and then invokes the
   * corresponding kernel function on its behalf.
   *
-  * This is the main loop of our kernel, called by OS_Start().
+  * This is the main loop of our kernel, called by Kernel_Start().
   */
 static void Kernel_Next_Request();
 
-void Setup_System_Clock(); 
+/*
+ * This function initializes the kernel and must be called before any other
+ * system calls.
+ */
+void Kernel_Init();
+
+/*
+ * This function starts the RTOS after creating a few tasks.
+ */
+void Kernel_Start(); 
+
+static void Setup_System_Clock(); 
 
 void Task_Next(); 
 #endif
