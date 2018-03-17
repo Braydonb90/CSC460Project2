@@ -2,6 +2,7 @@
 #define COMMON_H
 
 #include <util/delay.h>
+#include <avr/io.h>
 
 /****TYPEDEFS*********/
 typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
@@ -87,24 +88,6 @@ typedef struct kernel_request_param
 #define FALSE         0
 
 #define ANY           0xFF       // a mask for ALL message type
-
-/**********************/
-
-/****FUNCTIONS*********/
-
-/*
- * Blink specified pin num times. Used for debugging and error codes
- * Currently assumes pin is on port B
- */
-void Blink_Pin(unsigned int pin, unsigned int num){
-    int i;
-    for(i = 0; i < num; i++){
-        BIT_SET(PORTB, pin);
-        _delay_ms(BLINKDELAY);
-        BIT_RESET(PORTB, pin);
-        _delay_ms(BLINKDELAY);
-    }
-}
 
 /**********************/
 

@@ -3,11 +3,18 @@
 
 #include "common.h"
 #include "process_queue.h"
+#include "kernel.h"
 
 /* Aborts the RTOS and enters a "non-executing" state with an error code. That is, all tasks
  * will be stopped.
  */
 void OS_Abort(unsigned int error);
+
+/*
+ * Blink specified pin num times. Used for debugging and error codes
+ * Currently assumes pin is on port B
+ */
+void Blink_Pin(unsigned int pin, unsigned int num);
 
 /*
  * Initializes queues and stuff
@@ -56,6 +63,8 @@ PID   Task_Create_Period(void (*f)(void), int arg, TICK period, TICK wcet, TICK 
  * re-enters the ready state. All RR and Systems tasks are first-come-first-served.
  */   
 void Task_Next(void);
+
+void Task_Terminate(void);
 
 
 // The calling task gets its initial "argument" when it was created.

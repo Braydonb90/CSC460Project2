@@ -71,15 +71,25 @@ static void Kernel_Create_Task();
   */
 static void Dispatch();
 
-/**
-  * This internal kernel function is the "main" driving loop of this full-served
-  * model architecture. Basically, on Kernel_Start(), the kernel repeatedly
-  * requests the next user task's next system call and then invokes the
-  * corresponding kernel function on its behalf.
-  *
-  * This is the main loop of our kernel, called by Kernel_Start().
-  */
+/*
+ * This internal kernel function is the "main" driving loop of this full-served
+ * model architecture. Basically, on Kernel_Start(), the kernel repeatedly
+ * requests the next user task's next system call and then invokes the
+ * corresponding kernel function on its behalf.
+ *
+ * This is the main loop of our kernel, called by Kernel_Start().
+ */
 static void Kernel_Next_Request();
+
+/*
+ * Task has requested to be terminated. Need to clear mem and set to DEAD
+ */
+static void Kernel_Request_Terminate();
+
+/*
+ * The only "public" function
+ */
+void Kernel_Request(KERNEL_REQUEST_PARAM* krp);
 
 /*
  * This function initializes the kernel and must be called before any other

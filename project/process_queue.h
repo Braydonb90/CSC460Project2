@@ -31,6 +31,7 @@ typedef struct ProcessQueue {
     
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type);
 void Q_Push(ProcessQ* q, PD* pd);
+PD* Q_Pop(ProcessQ* q, PD* pd);
 void Q_Insert(ProcessQ* q, PD* pd);
 
 

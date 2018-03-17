@@ -181,7 +181,7 @@ static void Kernel_Next_Request()
             break;
         case TERMINATE:
             /* deallocate all resources used by this task */
-            Cp->state = DEAD;
+            Kernel_Request_Terminate();
             Dispatch();
             break;
         default:
@@ -190,6 +190,19 @@ static void Kernel_Next_Request()
         }
     } 
 }
+
+
+/*
+ * Task has requested to be terminated. Need to clear mem and set to DEAD
+ */
+static void Kernel_Request_Terminate() {
+    Cp->state = DEAD;
+    memset(Cp, 0, sizeof(PD));
+    Tasks--;
+}
+    
+
+
 
 //The only "public" function
 void Kernel_Request(KERNEL_REQUEST_PARAM* krp) {
