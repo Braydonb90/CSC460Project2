@@ -17,12 +17,12 @@
 # default_serial = "avrdoper"
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
-TTYS = /dev/ttyACM0
+TTYS = /dev/ttyACM1
 DEVICE = atmega2560
 CLOCK = 16000000
 CONFIG = -C ./avrdude.conf
 PROGRAMMER = -c wiring -P $(TTYS) -b 115200 -D
-OBJECTS = cswitch.o kernel.o os.o process_queue.o task_creation.o output.o
+OBJECTS = cswitch.o kernel.o os.o process_queue.o task_creation.o output.o uart.o
 FUSES	= -U lfuse:w:0xff:m	-U hfuse:w:0xd8:m	-U efuse:w:0xFD:m
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
