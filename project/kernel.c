@@ -446,10 +446,12 @@ void Kernel_Start()
  */
 void Kernel_Idle_Task() {
     for (;;) {
-        //TODO Toggle some pin here
+        BIT_TOGGLE(PORTB, DEBUG_PIN);
         if(current_request.request_type != NONE) {
+            BIT_RESET(PORTB, DEBUG_PIN);
             Enter_Kernel();
         }
+        _delay_ms(200);:
     }
 }
 
