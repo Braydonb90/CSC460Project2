@@ -26,7 +26,7 @@ void Q_Push(ProcessQ* q, PD* pd) {
     }
 }
 
-PD* Q_Pop(ProcessQ* q, PD* pd) {
+PD* Q_Pop(ProcessQ* q) {
     if (q->length == 0) {
         return NULL;
     }

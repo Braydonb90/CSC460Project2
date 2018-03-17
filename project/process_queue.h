@@ -14,7 +14,7 @@ typedef struct ProcessDescriptor
     unsigned char workSpace[WORKSPACE]; 
     volatile PROCESS_STATE state;
     voidfuncptr  code;   /* function to be executed as a task */
-    KERNEL_REQUEST_PARAM* request_param;
+    KERNEL_REQUEST_PARAM request_param; //Any reason to store this here?
     PRIORITY priority;
     int arg;
     PID pid;
@@ -31,7 +31,7 @@ typedef struct ProcessQueue {
     
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type);
 void Q_Push(ProcessQ* q, PD* pd);
-PD* Q_Pop(ProcessQ* q, PD* pd);
+PD* Q_Pop(ProcessQ* q);
 void Q_Insert(ProcessQ* q, PD* pd);
 
 
