@@ -33,6 +33,7 @@ PD* Q_Pop(ProcessQ* q) {
 
     PD* ret = q->front;
     q->front = q->front->next;
+    q->length--;
     return ret;
 }
 
