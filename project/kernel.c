@@ -1,9 +1,7 @@
 #include <string.h>
-#include <stdarg.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
-#include "uart.h"
 #include "kernel.h"
 
 
@@ -275,7 +273,7 @@ static void Kernel_Next_Request()
 
         /* save the Cp's stack pointer */
         Cp->sp = CurrentSp;
-       // Blink_Pin(CLOCK_PIN, current_request.request_type);
+       // Blink_Pin(DEBUG_PIN, current_request.request_type);
 
        // _delay_ms(500);
         switch(current_request.request_type){
@@ -364,7 +362,7 @@ static void Setup_System_Clock()
 ISR(TIMER4_COMPA_vect)
 {
     if (KernelActive) {
-//        BIT_TOGGLE(PORTB, CLOCK_PIN);
+        BIT_TOGGLE(PORTB, CLOCK_PIN);
 
         // Need to indicate that this is just a tick, for the likely case that 
         // the Cp doesn't need to get switched
@@ -378,39 +376,6 @@ ISR(TIMER4_COMPA_vect)
         Enter_Kernel();
     }
         
-}
-
-/*
- * Basic debugging function to blink LED corresponding to list of values
- */
-void debug_break(int argcount, ...) {
-    Disable_Interrupt();
-    if(argcount > 20) {
-        while(TRUE);
-    }
-
-    int buffer[20], i, num;
-    va_list args;
-    va_start(args, argcount);
-    for(i = 0; i < argcount; i++) {
-        buffer[i] = va_arg(args, int);
-    }
-    va_end(args);
-    while(TRUE) {
-        for(i = 0; i < argcount; i++) { 
-            num = buffer[i];
-            _delay_ms(500);
-            if(num > 10 ||  num < 0) {
-                BIT_SET(PORTB, CLOCK_PIN);
-                _delay_ms(500);
-                BIT_RESET(PORTB, CLOCK_PIN);
-            }
-            else{
-                Blink_Pin(CLOCK_PIN, num);
-            }
-        }
-        _delay_ms(1000);
-    }
 }
 
 /*================
@@ -429,6 +394,7 @@ void Kernel_Init()
     KernelActive = 0;
     NextP = 0;
 
+    BIT_SET(DDRB, DEBUG_PIN);
     BIT_SET(DDRB, CLOCK_PIN);
     BIT_SET(DDRB, ERROR_PIN);
 
