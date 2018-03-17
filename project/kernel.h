@@ -2,6 +2,7 @@
 #define KERNEL_H
 
 #include "common.h"
+#include "output.h"
 #include "process_queue.h"
 #include "os.h"
 
@@ -36,73 +37,26 @@ extern void user_main();
 extern void CSwitch();
 extern void Exit_Kernel();    /* this is the same as CSwitch() */
 
-/* Prototype */
-void Task_Terminate(void);
-
-/** 
-  * This external function could be implemented in two ways:
-  *  1) as an external function call, which is called by Kernel API call stubs;
-  *  2) as an inline macro which maps the call into a "software interrupt";
-  *       as for the AVR processor, we could use the external interrupt feature,
-  *       i.e., INT0 pin.
-  *  Note: Interrupts are assumed to be disabled upon calling Enter_Kernel().
-  *     This is the case if it is implemented by software interrupt. However,
-  *     as an external function call, it must be done explicitly. When Enter_Kernel()
-  *     returns, then interrupts will be re-enabled by Enter_Kernel().
-  */ 
+/* 
+ * This external function could be implemented in two ways:
+ *  1) as an external function call, which is called by Kernel API call stubs;
+ *  2) as an inline macro which maps the call into a "software interrupt";
+ *       as for the AVR processor, we could use the external interrupt feature,
+ *       i.e., INT0 pin.
+ *  Note: Interrupts are assumed to be disabled upon calling Enter_Kernel().
+ *     This is the case if it is implemented by software interrupt. However,
+ *     as an external function call, it must be done explicitly. When Enter_Kernel()
+ *     returns, then interrupts will be re-enabled by Enter_Kernel().
+ */ 
 extern void Enter_Kernel();
 
-/**
- * When creating a new task, it is important to initialize its stack just like
- * it has called "Enter_Kernel()"; so that when we switch to it later, we
- * can just restore its execution context on its stack.
- * (See file "cswitch.S" for details.)
- */
-void Kernel_Create_Task_At( PD *p, voidfuncptr f ); 
-
-/**
-  *  Create a new task
-  */
-static void Kernel_Create_Task();
-
-/**
-  * This internal kernel function is a part of the "scheduler". It chooses the 
-  * next task to run, i.e., Cp.
-  */
-static void Dispatch();
-
 /*
- * This internal kernel function is the "main" driving loop of this full-served
- * model architecture. Basically, on Kernel_Start(), the kernel repeatedly
- * requests the next user task's next system call and then invokes the
- * corresponding kernel function on its behalf.
+ * This is how the rest of the OS submits requests to the kernel
  *
- * This is the main loop of our kernel, called by Kernel_Start().
- */
-static void Kernel_Next_Request();
-
-/*
- * Task has requested to be terminated. Need to clear mem and set to DEAD
- */
-static void Kernel_Request_Terminate();
-
-/*
  * The only "public" function
+ * Param struct should be small enough that passing copies is fine, I think
+ * Was concerned about structs going out of scope. Maybe declaring them as static would avoid that???
  */
-void Kernel_Request(KERNEL_REQUEST_PARAM* krp);
+void Kernel_Request();
 
-/*
- * This function initializes the kernel and must be called before any other
- * system calls.
- */
-void Kernel_Init();
-
-/*
- * This function starts the RTOS after creating a few tasks.
- */
-void Kernel_Start(); 
-
-static void Setup_System_Clock(); 
-
-void Task_Next(); 
 #endif
