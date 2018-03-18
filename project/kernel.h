@@ -6,8 +6,6 @@
 #include "process_queue.h"
 #include "os.h"
 
-#define Disable_Interrupt()		asm volatile ("cli"::)
-#define Enable_Interrupt()		asm volatile ("sei"::)
 
 /*
  * external "main" function. first task to run, and should initialize the starting tasks

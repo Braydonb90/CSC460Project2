@@ -125,6 +125,8 @@ static ProcessQ periodic_q;
 static ProcessQ system_q;
 static ProcessQ rr_q;
 
+BOOL idling = 0;
+
 
 /****Start of Implementation****/
 
@@ -187,6 +189,7 @@ static void Kernel_Create_Task()
         Process[x].priority = current_request.priority;
         Process[x].pid = x;
 
+
         switch (Process[x].priority){
             case SYSTEM:
                 Q_Push(&system_q, Process + x);
@@ -215,31 +218,37 @@ static void Dispatch()
 {
     //put current process back in queue, if relevant
     //if the request was terminate, Cp should already be dead    
-    if (Cp->state != DEAD) {
-        if(current_request.request_type == TERMINATE) {
-            OS_Abort(INVALID_TERMINATE);
-        }
-        Cp->state = READY;
-        switch(Cp->priority) {
-            case SYSTEM:
+    switch(Cp->priority) {
+        case SYSTEM:
+            //only push system task if it wasn't running and wasn't killed
+            if(Cp->state != RUNNING && Cp->state != DEAD) {
+                Cp->state = READY;
                 Q_Push(&system_q, (PD*)Cp);
-                break;
-            case PERIODIC:
-                Q_Insert(&periodic_q, (PD*)Cp);
-                break;
-            case RR:
+            }
+            break;
+        case PERIODIC:
+            Q_Insert(&periodic_q, (PD*)Cp);
+            break;
+        case RR:
+            if(Cp->state != DEAD){
+                Cp->state = READY;
                 Q_Push(&rr_q, (PD*)Cp);
-                break;
-            case -1:
-                break;
-            default:
-                OS_Abort(INVALID_PRIORITY_DISPATCH);
-                break;
-        }
-    } 
+            }
+            break;
+        case -1:
+            break;
+        default:
+            OS_Abort(INVALID_PRIORITY_DISPATCH);
+            break;
+    }
+    idling = FALSE;
+
     //find new process 
     if (system_q.length > 0) {
         Cp = Q_Pop(&system_q);
+        if(Cp == NULL) {
+            OS_Abort(QUEUE_ERROR);
+        }
         Cp->state = RUNNING;
     }
     else if(periodic_q.length > 0) {
@@ -251,7 +260,12 @@ static void Dispatch()
         Cp->state = RUNNING;
     }
     else {
+        idling = TRUE;
         Cp = &idle_process;
+    }
+
+    if(!idling) {
+        BIT_RESET(PORTB, DEBUG_PIN);
     }
 }
 
@@ -273,9 +287,6 @@ static void Kernel_Next_Request()
 
         /* save the Cp's stack pointer */
         Cp->sp = CurrentSp;
-       // Blink_Pin(DEBUG_PIN, current_request.request_type);
-
-       // _delay_ms(500);
         switch(current_request.request_type){
             case CREATE:
                 Kernel_Create_Task();
@@ -293,6 +304,7 @@ static void Kernel_Next_Request()
                 break;
             case TIMER_TICK:
                 //Only time we do anything is if task is RR?
+                //Yes, but 
                 Dispatch();
                 break;
             default:
@@ -363,6 +375,7 @@ ISR(TIMER4_COMPA_vect)
 {
     if (KernelActive) {
         BIT_TOGGLE(PORTB, CLOCK_PIN);
+        
 
         // Need to indicate that this is just a tick, for the likely case that 
         // the Cp doesn't need to get switched
@@ -417,6 +430,7 @@ void Kernel_Init()
 
 
 
+
     //Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXTHREAD; x++) {
         memset(&(Process[x]),0,sizeof(PD));
@@ -427,11 +441,13 @@ void Kernel_Init()
 
   
 /*
- * This function starts the RTOS after creating a few tasks.
+ * This function starts the RTOS
  */
 void Kernel_Start() 
 {   
     if ( (! KernelActive) && (Tasks > 0)) {
+        //TODO Going with this for now, as I don't think it makes sense to consider Idle as a real task
+        Tasks = 0;
         Disable_Interrupt();
 
         /* here we go...  */
@@ -447,11 +463,13 @@ void Kernel_Start()
 void Kernel_Idle_Task() {
     for (;;) {
         BIT_TOGGLE(PORTB, DEBUG_PIN);
+        //TODO decide if this should be here, or if tick ISR should check for outstanding requests
         if(current_request.request_type != NONE) {
             BIT_RESET(PORTB, DEBUG_PIN);
+            idling = FALSE;
             Enter_Kernel();
         }
-        _delay_ms(200);:
+        _delay_ms(200);
     }
 }
 

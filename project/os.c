@@ -22,16 +22,23 @@ void OS_Init(void) {
  */
 
 PID   Task_Create_System(voidfuncptr f, int arg) {
-    //TODO
+    KERNEL_REQUEST_PARAM prm;
+    prm.request_type = CREATE;
+    prm.priority = SYSTEM;
+    prm.code = f;
+    prm.arg = arg;
+
+    Kernel_Request(prm);
+    return prm.pid;
 }
 PID   Task_Create_RR(voidfuncptr f, int arg) {
-    //TODO
     KERNEL_REQUEST_PARAM prm;
     prm.request_type = CREATE;
     prm.priority = RR;
     prm.code = f;
     prm.arg = arg;
 
+    //TODO need to pass pointer here
     Kernel_Request(prm);
     return prm.pid;
 }

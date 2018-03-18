@@ -39,6 +39,7 @@ typedef enum error_code {
     INVALID_PRIORITY_CREATE,
     INVALID_PRIORITY_DISPATCH,
     INVALID_TERMINATE,
+    QUEUE_ERROR,
     NO_DEAD_PDS
 } ERROR_CODE;    
 /*
@@ -74,6 +75,8 @@ typedef struct kernel_request_param
 #define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
 #define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
 #define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
+#define Disable_Interrupt()		asm volatile ("cli"::)
+#define Enable_Interrupt()		asm volatile ("sei"::)
 
 /********************/
 
@@ -81,10 +84,11 @@ typedef struct kernel_request_param
 
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
-#define MSECPERTICK   100   // resolution of a system TICK in milliseconds
+#define MSECPERTICK   10   // resolution of a system TICK in milliseconds
 #define BLINKDELAY 100
 
-//shouldn't matter that these are the same
+//These pins are on port B
+#define DEBUG_PIN 3
 #define ERROR_PIN 4
 #define CLOCK_PIN 5
 

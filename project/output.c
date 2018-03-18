@@ -7,6 +7,7 @@ static void debug_blink_array(int count, int* arr);
 
 void Blink_Pin(unsigned int pin, unsigned int num){
     int i;
+    BIT_RESET(PORTB, pin);
     for(i = 0; i < num; i++){
         BIT_SET(PORTB, pin);
         _delay_ms(BLINKDELAY);
