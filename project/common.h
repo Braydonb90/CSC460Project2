@@ -38,6 +38,7 @@ typedef enum error_code {
     INVALID_REQUEST = 1,
     INVALID_PRIORITY_CREATE,
     INVALID_PRIORITY_DISPATCH,
+    INVALID_STATE_DISPATCH,
     INVALID_TERMINATE,
     QUEUE_ERROR,
     NO_DEAD_PDS
@@ -85,7 +86,7 @@ typedef struct kernel_request_param
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
 #define MSECPERTICK   10   // resolution of a system TICK in milliseconds
-#define BLINKDELAY 100
+#define BLINKDELAY 150
 
 //These pins are on port B
 #define DEBUG_PIN 3
