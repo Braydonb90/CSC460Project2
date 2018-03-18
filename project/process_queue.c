@@ -41,7 +41,7 @@ PD* Q_Pop(ProcessQ* q) {
         return prev;
     }
     //otherwise
-    while(cur->next != NULL){
+    while(cur != NULL){
         if(cur->state == READY){
             prev->next = cur->next;
             cur->next = NULL;
