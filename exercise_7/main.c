@@ -48,7 +48,6 @@ typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */
 /*--DEBUG----------------------*/
 
 void debug_set_led(int state){ 
-   BIT_SET(DDRB,4);
    if(state == 1)
        BIT_SET(PORTB, 4);
    else
@@ -237,6 +236,7 @@ void Dispatch()
 
 
      /* we have a new CurrentP */
+	 debug_toggle_led();
    CurrentP = &(Process[NextP]);
    CurrentP->state = RUNNING;
     
@@ -291,8 +291,8 @@ void OS_Start()
       KernelActive = 1;
 
 
-      debug_toggle_led();
       _delay_ms(1000);
+   BIT_SWAP(DDRH,6);
       //This shouldn't return here but it do
       Exit_Kernel();
    }
@@ -317,16 +317,17 @@ void Task_Create( voidfuncptr f)
 void CSwitch_Test(){
     CSwitch();
 }
+
 void Task_Next() 
 {
    if (KernelActive) {
      Disable_Interrupt();
      CurrentP->state = READY;
-     BIT_SET(PORTB,4);
+     //BIT_SET(PORTB,4);
      CSwitch_Test();
      /* resume here when this task is rescheduled again later */
      Enable_Interrupt();
-     BIT_RESET(PORTB,4);
+     //BIT_RESET(PORTB,4);
   }
 }
 
@@ -355,8 +356,8 @@ void Setup_Timer()
     //Set prescaller to 256
     TCCR4B |= (1<<CS42);
 
-    //Set TOP value (0.5 seconds)
-    OCR4A = 32500;
+    //Set TOP value (0.25 seconds)
+    OCR4A = 625;
 
     //Enable interupt A for timer 4.
     TIMSK4 |= (1<<OCIE4A);
@@ -392,10 +393,10 @@ void Ping()
     for(;;){
         //LED on
         BIT_SET(PORTA, 6);
-        _delay_ms(500);
-        debug_toggle_led();
+        _delay_ms(1000);
+       // debug_toggle_led();
         BIT_RESET(PORTA, 6);
-        _delay_ms(500);
+        _delay_ms(1000);
     }
 }
 
@@ -412,9 +413,9 @@ void Pong()
     for(;;) {
         //LED on
         BIT_SET(PORTB, 6);
-        _delay_ms(500);
+        _delay_ms(1000);
         BIT_RESET(PORTB, 6);
-        _delay_ms(500);
+        _delay_ms(1000);
     }
 }
 
@@ -425,6 +426,8 @@ void Pong()
   */
 int main() 
 {
+   BIT_SET(DDRB,4);
+   BIT_SET(DDRH,6);
     OS_Init();
     Task_Create( Pong );
     Task_Create( Ping );
