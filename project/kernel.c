@@ -1,89 +1,139 @@
 #include <string.h>
+#include <stdarg.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
+#include "uart.h"
 #include "kernel.h"
-#include "common.h"
 
-#define DEBUG_LED_PIN 4
-
-
-/*--DEBUG----------------------*/
-
-void debug_set_led(int state){ 
-   BIT_SET(DDRB,DEBUG_LED_PIN);
-   if(state == 1)
-       BIT_SET(PORTB, DEBUG_LED_PIN);
-   else
-       BIT_RESET(PORTB, DEBUG_LED_PIN);
-}
-void debug_toggle_led(){
-    if(!(DDRB & (1<<DEBUG_LED_PIN)))
-        BIT_SET(DDRB, DEBUG_LED_PIN);
-    
-    BIT_TOGGLE(PORTB, DEBUG_LED_PIN);
-}
-
-void debug_flash_led(int num){
-    int i;
-    int delay = 200; 
-    for(i = 0; i < num; i++){
-        debug_set_led(1);
-        _delay_ms(delay);
-        debug_set_led(0);
-        _delay_ms(delay);
-    }
-}
-
-/*----------------------------*/
 
 /*===========
-  * RTOS Internal
-  *===========
-  */
+ * RTOS Internal
+ *===========
+ */
 
+
+/****Prototypes****/
+
+/*
+ * When creating a new task, it is important to initialize its stack just like
+ * it has called "Enter_Kernel()"; so that when we switch to it later, we
+ * can just restore its execution context on its stack.
+ * (See file "cswitch.S" for details.)
+ */
+static void Kernel_Create_Task_At( PD *p, voidfuncptr f ); 
 
 /**
-  * This table contains ALL process descriptors. It doesn't matter what
-  * state a task is in.
+  *  Create a new task
   */
+static void Kernel_Create_Task();
+
+/**
+  * This internal kernel function is a part of the "scheduler". It chooses the 
+  * next task to run, i.e., Cp.
+  */
+static void Dispatch();
+
+/*
+ * This internal kernel function is the "main" driving loop of this full-served
+ * model architecture. Basically, on Kernel_Start(), the kernel repeatedly
+ * requests the next user task's next system call and then invokes the
+ * corresponding kernel function on its behalf.
+ *
+ * This is the main loop of our kernel, called by Kernel_Start().
+ */
+static void Kernel_Next_Request();
+
+/*
+ * Task has requested to be terminated. Need to clear mem and set to DEAD
+ */
+static void Kernel_Request_Terminate();
+
+/*
+ * This function initializes the kernel and must be called before any other
+ * system calls.
+ */
+static void Kernel_Init();
+
+/*
+ * This function starts the RTOS after creating a few tasks.
+ */
+static void Kernel_Start(); 
+
+/*
+ * Set up the System Clock. An interrupt is called every tick using this clock
+ */
+static void Setup_System_Clock(); 
+
+/*
+ * System idle task
+ */
+void Kernel_Idle_Task();
+
+void debug_break(int argcount, ...);
+/****End of Prototypes****/
+
+/****Other Things****/
+
+/*
+ * This table contains ALL process descriptors. It doesn't matter what
+ * state a task is in.
+ */
 static PD Process[MAXTHREAD];
 
-/**
-  * The process descriptor of the currently RUNNING task.
-  */
+/*
+ * Process descriptor for the idle task
+ */
+static PD idle_process;
+
+/*
+ * The process descriptor of the currently RUNNING task.
+ */
 volatile static PD* Cp; 
 
-/** 
-  * Since this is a "full-served" model, the kernel is executing using its own
-  * stack. We can allocate a new workspace for this kernel stack, or we can
-  * use the stack of the "main()" function, i.e., the initial C runtime stack.
-  * (Note: This and the following stack pointers are used primarily by the
-  *   context switching code, i.e., CSwitch(), which is written in assembly
-  *   language.)
-  */         
+/*
+ * The currently assigned request info, waiting to be processed
+ * Requests aren't always associated with a task, so need to have this
+ */
+static KERNEL_REQUEST_PARAM current_request;
+
+/* 
+ * Since this is a "full-served" model, the kernel is executing using its own
+ * stack. We can allocate a new workspace for this kernel stack, or we can
+ * use the stack of the "main()" function, i.e., the initial C runtime stack.
+ * (Note: This and the following stack pointers are used primarily by the
+ *   context switching code, i.e., CSwitch(), which is written in assembly
+ *   language.)
+ */         
 volatile unsigned char *KernelSp;
 
-/**
-  * This is a "shadow" copy of the stack pointer of "Cp", the currently
-  * running task. During context switching, we need to save and restore
-  * it into the appropriate process descriptor.
-  */
+/*
+ * This is a "shadow" copy of the stack pointer of "Cp", the currently
+ * running task. During context switching, we need to save and restore
+ * it into the appropriate process descriptor.
+ */
 volatile unsigned char *CurrentSp;
 
-/** index to next task to run */
+/* index to next task to run */
 volatile static unsigned int NextP;  
 
-/** 1 if kernel has been started; 0 otherwise. */
+/* 1 if kernel has been started; 0 otherwise. */
 volatile static unsigned int KernelActive;  
 
-/** number of tasks created so far */
+/* number of tasks created so far */
 volatile static unsigned int Tasks;  
+
+static ProcessQ periodic_q;
+static ProcessQ system_q;
+static ProcessQ rr_q;
+
+
+/****Start of Implementation****/
 
 /*
  * (See file "cswitch.S" for details.)
  */
-void Kernel_Create_Task_At( PD *p, voidfuncptr f ) 
+static void Kernel_Create_Task_At( PD *p, voidfuncptr f ) 
 {   
    unsigned char *sp;
 
@@ -113,92 +163,171 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
      
    p->sp = sp;		/* stack pointer into the "workSpace" */
    p->code = f;		/* function to be executed as a task */
-   p->request = NONE;
+   p->request_param.request_type = NONE;
 
    p->state = READY;
-
+   Tasks++;
 }
 
 
-/**
-  *  Create a new task
-  */
-static void Kernel_Create_Task( voidfuncptr f ) 
+/*
+ *  Create a new task
+ */
+static void Kernel_Create_Task() 
 {
-   int x;
+    int x;
+    if (Tasks == MAXTHREAD) return;  /* Too many task! */
 
-   if (Tasks == MAXTHREAD) return;  /* Too many task! */
+    /* find a DEAD PD that we can use  */
+    for (x = 0; x < MAXTHREAD; x++) {
+        if (Process[x].state == DEAD) break;
+    }
+    if(x < MAXTHREAD) {
+        Kernel_Create_Task_At(Process + x, current_request.code);
+        
+        Process[x].arg = current_request.arg;
+        Process[x].priority = current_request.priority;
+        Process[x].pid = x;
 
-   /* find a DEAD PD that we can use  */
-   for (x = 0; x < MAXTHREAD; x++) {
-       if (Process[x].state == DEAD) break;
-   }
-
-   ++Tasks;
-   Kernel_Create_Task_At( &(Process[x]), f );
-
+        switch (Process[x].priority){
+            case SYSTEM:
+                Q_Push(&system_q, Process + x);
+                break;
+            case PERIODIC:
+                Q_Insert(&periodic_q, Process + x);
+                break;
+            case RR:
+                Q_Push(&rr_q, Process + x);
+                break;
+            default:
+                OS_Abort(INVALID_PRIORITY_CREATE);
+        }
+    }
+    else {
+        OS_Abort(NO_DEAD_PDS);
+    }
 }
 
 
-/**
-  * This internal kernel function is a part of the "scheduler". It chooses the 
-  * next task to run, i.e., Cp.
-  */
+/*
+ * This internal kernel function is a part of the "scheduler". It chooses the 
+ * next task to run, i.e., Cp.
+ */
 static void Dispatch()
 {
-     /* find the next READY task
-       * Note: if there is no READY task, then this will loop forever!.
-       */
-   while(Process[NextP].state != READY) {
-      NextP = (NextP + 1) % MAXTHREAD;
-   }
-
-   Cp = &(Process[NextP]);
-   CurrentSp = Cp->sp;
-   Cp->state = RUNNING;
-
-   NextP = (NextP + 1) % MAXTHREAD;
+    //put current process back in queue, if relevant
+    //if the request was terminate, Cp should already be dead    
+    if (Cp->state != DEAD) {
+        if(current_request.request_type == TERMINATE) {
+            OS_Abort(INVALID_TERMINATE);
+        }
+        Cp->state = READY;
+        switch(Cp->priority) {
+            case SYSTEM:
+                Q_Push(&system_q, (PD*)Cp);
+                break;
+            case PERIODIC:
+                Q_Insert(&periodic_q, (PD*)Cp);
+                break;
+            case RR:
+                Q_Push(&rr_q, (PD*)Cp);
+                break;
+            case -1:
+                break;
+            default:
+                OS_Abort(INVALID_PRIORITY_DISPATCH);
+                break;
+        }
+    } 
+    //find new process 
+    if (system_q.length > 0) {
+        Cp = Q_Pop(&system_q);
+        Cp->state = RUNNING;
+    }
+    else if(periodic_q.length > 0) {
+        Cp = Q_Pop(&periodic_q);
+        Cp->state = RUNNING;
+    }
+    else if(rr_q.length > 0) {
+        Cp = Q_Pop(&rr_q);
+        Cp->state = RUNNING;
+    }
+    else {
+        Cp = &idle_process;
+    }
 }
 
 /*
- * This is the main loop of our kernel, called by OS_Start().
+ * This is the main loop of our kernel, called by Kernel_Start().
  */
 static void Kernel_Next_Request() 
 {
    Dispatch();  /* select a new task to run */
 
-   while(1) {
-       Cp->request = NONE; /* clear its request */
+    while(1) {
+        Cp->request_param.request_type = NONE; /* clear its request */
 
-       /* activate this newly selected task */
-       CurrentSp = Cp->sp;
-       Exit_Kernel();    /* or CSwitch() */
+        /* activate this newly selected task */
+        CurrentSp = Cp->sp;
+        Exit_Kernel();    /* The task will be running after this */
 
-       /* if this task makes a system call, it will return to here! */
+        /* if this task makes a system call, it will return to here! */
 
         /* save the Cp's stack pointer */
-       Cp->sp = CurrentSp;
+        Cp->sp = CurrentSp;
+       // Blink_Pin(CLOCK_PIN, current_request.request_type);
 
-       switch(Cp->request){
-       case CREATE:
-           Kernel_Create_Task( Cp->code );
-           break;
-       case NEXT:
-	   case NONE:
-           /* NONE could be caused by a timer interrupt */
-          Cp->state = READY;
-          Dispatch();
-          break;
-       case TERMINATE:
-          /* deallocate all resources used by this task */
-          Cp->state = DEAD;
-          Dispatch();
-          break;
-       default:
-          /* Houston! we have a problem here! */
-          break;
-       }
+       // _delay_ms(500);
+        switch(current_request.request_type){
+            case CREATE:
+                Kernel_Create_Task();
+                break;
+            case NEXT:
+            case NONE:
+                /* NONE could be caused by a timer interrupt --- this is no longer true */
+                Cp->state = READY;
+                Dispatch();
+                break;
+            case TERMINATE:
+                /* deallocate all resources used by this task */
+                Kernel_Request_Terminate();
+                Dispatch();
+                break;
+            case TIMER_TICK:
+                //Only time we do anything is if task is RR?
+                Dispatch();
+                break;
+            default:
+                /* Houston! we have a problem here! */
+                OS_Abort(INVALID_REQUEST);
+                break;
+        }
+        current_request.request_type = NONE;
     } 
+}
+
+
+/*
+ * Task has requested to be terminated. Need to clear mem and set to DEAD
+ */
+static void Kernel_Request_Terminate() {
+    //This cast shushes compiler. Assuming it's ok?
+    memset((PD*)Cp, 0, sizeof(PD));
+    Cp->state = DEAD;
+    Tasks--;
+}
+    
+//The only "public" function
+void Kernel_Request(KERNEL_REQUEST_PARAM krp) {
+    if(KernelActive) {
+        Disable_Interrupt();
+        //why am I storing this???
+        //to pass values back
+        Cp->request_param = krp;
+        current_request = krp;
+
+        Enter_Kernel();
+    }
 }
 
 /*================
@@ -207,7 +336,7 @@ static void Kernel_Next_Request()
  */
 
 
-void Setup_System_Clock() 
+static void Setup_System_Clock() 
 {
 
     TCCR4A = 0;
@@ -229,149 +358,140 @@ void Setup_System_Clock()
   
 }
 
+/*
+ * Called once every system tick
+ */
 ISR(TIMER4_COMPA_vect)
 {
-    debug_toggle_led();
-    Task_Next();
+    if (KernelActive) {
+//        BIT_TOGGLE(PORTB, CLOCK_PIN);
+
+        // Need to indicate that this is just a tick, for the likely case that 
+        // the Cp doesn't need to get switched
+        // There should not be any current request at this point
+        // but if there is????
+        KERNEL_REQUEST_PARAM prm;
+        prm.request_type = TIMER_TICK; 
+
+        current_request = prm;
+
+        Enter_Kernel();
+    }
+        
 }
 
+/*
+ * Basic debugging function to blink LED corresponding to list of values
+ */
+void debug_break(int argcount, ...) {
+    Disable_Interrupt();
+    if(argcount > 20) {
+        while(TRUE);
+    }
+
+    int buffer[20], i, num;
+    va_list args;
+    va_start(args, argcount);
+    for(i = 0; i < argcount; i++) {
+        buffer[i] = va_arg(args, int);
+    }
+    va_end(args);
+    while(TRUE) {
+        for(i = 0; i < argcount; i++) { 
+            num = buffer[i];
+            _delay_ms(500);
+            if(num > 10 ||  num < 0) {
+                BIT_SET(PORTB, CLOCK_PIN);
+                _delay_ms(500);
+                BIT_RESET(PORTB, CLOCK_PIN);
+            }
+            else{
+                Blink_Pin(CLOCK_PIN, num);
+            }
+        }
+        _delay_ms(1000);
+    }
+}
 
 /*================
-  * RTOS  API  and Stubs
-  *================
-  */
+ * RTOS  API  and Stubs
+ *================
+ */
 
-/**
-  * This function initializes the RTOS and must be called before any other
-  * system calls.
-  */
-void OS_Init() 
+/*
+ * This function initializes the kernel and must be called before any other
+ * system calls.
+ */
+void Kernel_Init() 
 {
-   int x;
+    int x;
+    Tasks = 0;
+    KernelActive = 0;
+    NextP = 0;
 
-   Tasks = 0;
-   KernelActive = 0;
-   NextP = 0;
-	//Reminder: Clear the memory for the task on creation.
-   for (x = 0; x < MAXTHREAD; x++) {
-      memset(&(Process[x]),0,sizeof(PD));
-      Process[x].state = DEAD;
-   }
+    BIT_SET(DDRB, CLOCK_PIN);
+    BIT_SET(DDRB, ERROR_PIN);
+
+    Q_Init(&system_q, SYSTEM);
+    Q_Init(&periodic_q, PERIODIC);
+    Q_Init(&rr_q, RR);
+
+    //Create the user main task request
+    KERNEL_REQUEST_PARAM prm;
+    prm.request_type = CREATE;
+    prm.priority = SYSTEM;
+    prm.code = user_main;
+    prm.arg = 0;
+
+    //Create system idle process
+    //Shouldn't need to do any initialization? 
+    memset(&idle_process, 0, sizeof(PD));
+    Kernel_Create_Task_At(&idle_process, Kernel_Idle_Task);
+    idle_process.priority = -1;
+
+
+
+    //Reminder: Clear the memory for the task on creation.
+    for (x = 0; x < MAXTHREAD; x++) {
+        memset(&(Process[x]),0,sizeof(PD));
+        Process[x].state = DEAD;
+    }
+    current_request = prm;
 }
 
-
-/**
-  * This function starts the RTOS after creating a few tasks.
-  */
-void OS_Start() 
+  
+/*
+ * This function starts the RTOS after creating a few tasks.
+ */
+void Kernel_Start() 
 {   
-   if ( (! KernelActive) && (Tasks > 0)) {
-       Disable_Interrupt();
-      /* we may have to initialize the interrupt vector for Enter_Kernel() here. */
+    if ( (! KernelActive) && (Tasks > 0)) {
+        Disable_Interrupt();
 
-      /* here we go...  */
-      KernelActive = 1;
-      Kernel_Next_Request();
-      /* NEVER RETURNS!!! */
-   }
+        /* here we go...  */
+        KernelActive = 1;
+        Kernel_Next_Request();
+        /* NEVER RETURNS!!! */
+     }
+} 
+
+/*
+ * The idle task for the OS. Has the lowest priority, runs whenever nothing else is being run
+ */
+void Kernel_Idle_Task() {
+    for (;;) {
+        //TODO Toggle some pin here
+        if(current_request.request_type != NONE) {
+            Enter_Kernel();
+        }
+    }
 }
 
 
-void Task_Create( voidfuncptr f)
-{
-   if (KernelActive ) {
-     Disable_Interrupt();
-     Cp ->request = CREATE;
-     Cp->code = f;
-     Enter_Kernel();
-   } else { 
-      /* call the RTOS function directly */
-      Kernel_Create_Task( f );
-   }
-}
-
-/**
-  * The calling task gives up its share of the processor voluntarily.
-  */
-void Task_Next() 
-{
-   if (KernelActive) {
-     Disable_Interrupt();
-     Cp ->request = NEXT;
-     Enter_Kernel();
-  }
-}
-
-
-/**
-  * The calling task terminates itself.
-  */
-void Task_Terminate() 
-{
-   if (KernelActive) {
-      Disable_Interrupt();
-      Cp -> request = TERMINATE;
-      Enter_Kernel();
-     /* never returns here! */
-   }
-}
-
-/*============
-  * A Simple Test 
-  *============
-  */
-
-/**
-  * A cooperative "Ping" task.
-  */
-void Task_Ping() 
-{
-  int  x ;
-  BIT_SET(DDRA, 6);
-  for(;;){
-
-	//LED off
-    BIT_SET(PORTA, 6);
-    _delay_ms(400);
-
-    BIT_RESET(PORTA, 6);
-    _delay_ms(400);
-	  
-    Task_Next();
-  }
-}
-
-
-/**
-  * A cooperative "Pong" task.
-  */
-void Task_Pong() 
-{
-  int  x;
-  BIT_SET(DDRB, 6);
-  for(;;) {
-	//LED on
-    BIT_SET(PORTB, 6);
-    _delay_ms(200);
-
-    BIT_RESET(PORTB, 6);
-    _delay_ms(200);
-
-    Task_Next();
-  }
-}
-
-
-/**
-  * This function creates two cooperative tasks, "Ping" and "Pong". Both
-  * will run forever.
-  */
 void main() 
 {
-   OS_Init();
-   Setup_System_Clock();
-   Task_Create(Task_Pong);
-   Task_Create(Task_Ping);
-   OS_Start();
+    Kernel_Init();
+    Setup_System_Clock();
+    Kernel_Start();
 }
 
