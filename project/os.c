@@ -28,7 +28,7 @@ PID   Task_Create_System(voidfuncptr f, int arg) {
     prm.code = f;
     prm.arg = arg;
 
-    Kernel_Request(prm);
+    Kernel_Request(&prm);
     return prm.pid;
 }
 PID   Task_Create_RR(voidfuncptr f, int arg) {
@@ -38,8 +38,8 @@ PID   Task_Create_RR(voidfuncptr f, int arg) {
     prm.code = f;
     prm.arg = arg;
 
-    //TODO need to pass pointer here
-    Kernel_Request(prm);
+    Kernel_Request(&prm);
+    //Cant call getpid, since that only gets the current task's pid
     return prm.pid;
 }
 
@@ -57,20 +57,20 @@ void Task_Next()
 {
     KERNEL_REQUEST_PARAM prm;
     prm.request_type = NEXT;
-    Kernel_Request(prm);
+    Kernel_Request(&prm);
 }
 
 void Task_Terminate(void) {
     KERNEL_REQUEST_PARAM prm;
     prm.request_type = TERMINATE;
-    Kernel_Request(prm);
+    Kernel_Request(&prm);
 }
 
 /*
  * The calling task gets its initial "argument" when it was created.
  */
 int  Task_GetArg(void) {
-    //TODO
+    return Kernel_GetArg();
 }
 
 
@@ -78,7 +78,7 @@ int  Task_GetArg(void) {
  * returns the calling task's PID.
  */
 PID  Task_Pid(void) {
-    //TODO
+    return Kernel_GetPid();
 }
 
 

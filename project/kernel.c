@@ -93,7 +93,7 @@ volatile static PD* Cp;
  * The currently assigned request info, waiting to be processed
  * Requests aren't always associated with a task, so need to have this
  */
-static KERNEL_REQUEST_PARAM current_request;
+static KERNEL_REQUEST_PARAM* current_request;
 
 /* 
  * Since this is a "full-served" model, the kernel is executing using its own
@@ -183,11 +183,16 @@ static void Kernel_Create_Task()
         if (Process[x].state == DEAD) break;
     }
     if(x < MAXTHREAD) {
-        Kernel_Create_Task_At(Process + x, current_request.code);
+        Kernel_Create_Task_At(Process + x, current_request->code);
         
-        Process[x].arg = current_request.arg;
-        Process[x].priority = current_request.priority;
+        Process[x].arg = current_request->arg;
+        Process[x].priority = current_request->priority;
         Process[x].pid = x;
+        
+        //need to pass back pid. PD holds copy of param struct for safety reasons
+        //so current_request pointer needs to be assigned to
+        current_request->pid = x;
+        
 
 
         switch (Process[x].priority){
@@ -295,7 +300,10 @@ static void Kernel_Next_Request()
 
         /* save the Cp's stack pointer */
         Cp->sp = CurrentSp;
-        switch(current_request.request_type){
+        if(current_request == NULL) {
+            OS_Abort(NULL_REQUEST);
+        }
+        switch(current_request->request_type){
             case CREATE:
                 Kernel_Create_Task();
                 break;
@@ -311,7 +319,9 @@ static void Kernel_Next_Request()
                 Dispatch();
                 break;
             case TIMER_TICK:
-                //Only time we do anything is if task is RR?
+                //SYSTEM should never need an interrupt to switch (some timeout is a good idea?)
+                //PERIODIC should update here, and dispatch if past wcet
+                //RR is lowest priority, so dispatch immediately here
                 if(idling || Cp->priority != SYSTEM) { 
                     Dispatch();
                 }
@@ -321,9 +331,17 @@ static void Kernel_Next_Request()
                 OS_Abort(INVALID_REQUEST);
                 break;
         }
-        current_request.request_type = NONE;
+        current_request = NULL;
     } 
 }
+
+int Kernel_GetArg() {
+    return Cp->arg;
+}
+PID Kernel_GetPid() {
+    return Cp->pid;
+}
+
 
 
 /*
@@ -336,13 +354,11 @@ static void Kernel_Request_Terminate() {
     Tasks--;
 }
     
-//The only "public" function
-void Kernel_Request(KERNEL_REQUEST_PARAM krp) {
+//The main interface between the kernel and the user level
+void Kernel_Request(KERNEL_REQUEST_PARAM* krp) {
     if(KernelActive) {
         Disable_Interrupt();
-        //why am I storing this???
-        //to pass values back
-        Cp->request_param = krp;
+        Cp->request_param = *krp;
         current_request = krp;
 
         Enter_Kernel();
@@ -390,10 +406,14 @@ ISR(TIMER4_COMPA_vect)
         // the Cp doesn't need to get switched
         // There should not be any current request at this point
         // but if there is????
+        // Shouldn't be possible, as any request should immediately disable interrupts
+        if(current_request != NULL) {
+            OS_Abort(NON_NULL_REQUEST);
+        }
         KERNEL_REQUEST_PARAM prm;
         prm.request_type = TIMER_TICK; 
 
-        current_request = prm;
+        current_request = &prm;
 
         Enter_Kernel();
     }
@@ -437,15 +457,14 @@ void Kernel_Init()
     Kernel_Create_Task_At(&idle_process, Kernel_Idle_Task);
     idle_process.priority = -1;
 
-
-
-
     //Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXTHREAD; x++) {
         memset(&(Process[x]),0,sizeof(PD));
         Process[x].state = DEAD;
     }
-    current_request = prm;
+    current_request = &prm;
+    Kernel_Create_Task();
+    current_request = NULL;
 }
 
   
@@ -455,7 +474,7 @@ void Kernel_Init()
 void Kernel_Start() 
 {   
     if ( (! KernelActive) && (Tasks > 0)) {
-        //TODO Going with this for now, as I don't think it makes sense to consider Idle as a real task
+        //Idle task shouldn't be counted, as it doesn't take a slot in the PD array
         Tasks = 0;
         Disable_Interrupt();
 
@@ -471,12 +490,11 @@ void Kernel_Start()
  */
 void Kernel_Idle_Task() {
     for (;;) {
+        idling = TRUE;
         BIT_TOGGLE(PORTB, DEBUG_PIN);
         //TODO decide if this should be here, or if tick ISR should check for outstanding requests
-        if(current_request.request_type != NONE) {
-            BIT_RESET(PORTB, DEBUG_PIN);
-            idling = FALSE;
-            Enter_Kernel();
+        if(current_request != NULL) {
+            OS_Abort(DEBUG_IDLE_HALT);
         }
         _delay_ms(200);
     }
