@@ -66,6 +66,9 @@ typedef struct kernel_request_param
     PID pid;                            //PID returned by kernel on creation etc.
     KERNEL_REQUEST_TYPE request_type;   //type of request
     voidfuncptr code;                    //code associated with process
+    TICK wcet;
+    TICK period;
+    TICK offset;
     PRIORITY priority;
     int arg;    
 } KERNEL_REQUEST_PARAM;

@@ -50,7 +50,7 @@ void Task_Pong_RR()
 }
 /*
  * System version of "Ping" task.
- * Yields every iteration, terminates after arg iterations
+ * Yields every iteration, terminates after arg iteration
  */
 void Task_Ping_System() 
 {

@@ -121,11 +121,15 @@ volatile static unsigned int KernelActive;
 /* number of tasks created so far */
 volatile static unsigned int Tasks;  
 
+/* number of Ticks since system start */
+/* at 10ms per tick, should take ~497 days to overflow */ 
+static TICK Elapsed;
+
 static ProcessQ periodic_q;
 static ProcessQ system_q;
 static ProcessQ rr_q;
 
-BOOL idling = 0;
+BOOL idling;
 
 
 /****Start of Implementation****/
@@ -225,8 +229,8 @@ static void Dispatch()
     //if the request was terminate, Cp should already be dead    
     switch(Cp->priority) {
         case SYSTEM:
-            //only push system task if it wasn't running and wasn't dead
-            if(Cp->state != RUNNING && Cp->state != DEAD) {
+            //only push system task if it isn't dead
+            if(Cp->state != DEAD) {
                 Cp->state = READY;
                 Q_Push(&system_q, (PD*)Cp);
             }
@@ -433,6 +437,8 @@ void Kernel_Init()
 {
     int x;
     Tasks = 0;
+    Elapsed = 0;
+    idling = FALSE;
     KernelActive = 0;
     NextP = 0;
 
