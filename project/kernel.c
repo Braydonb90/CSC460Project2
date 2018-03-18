@@ -220,10 +220,16 @@ static void Dispatch()
     //if the request was terminate, Cp should already be dead    
     switch(Cp->priority) {
         case SYSTEM:
-            //only push system task if it wasn't running and wasn't killed
+            //only push system task if it wasn't running and wasn't dead
             if(Cp->state != RUNNING && Cp->state != DEAD) {
                 Cp->state = READY;
                 Q_Push(&system_q, (PD*)Cp);
+            }
+            else if (Cp->state == DEAD){
+                break;
+            }
+            else{
+                OS_Abort(INVALID_STATE_DISPATCH);
             }
             break;
         case PERIODIC:
@@ -242,14 +248,16 @@ static void Dispatch()
             break;
     }
     idling = FALSE;
-
+    Cp = NULL;
     //find new process 
     if (system_q.length > 0) {
         Cp = Q_Pop(&system_q);
         if(Cp == NULL) {
             OS_Abort(QUEUE_ERROR);
         }
-        Cp->state = RUNNING;
+        else {
+            Cp->state = RUNNING;
+        }
     }
     else if(periodic_q.length > 0) {
         Cp = Q_Pop(&periodic_q);
@@ -304,8 +312,9 @@ static void Kernel_Next_Request()
                 break;
             case TIMER_TICK:
                 //Only time we do anything is if task is RR?
-                //Yes, but 
-                Dispatch();
+                if(idling || Cp->priority != SYSTEM) { 
+                    Dispatch();
+                }
                 break;
             default:
                 /* Houston! we have a problem here! */
