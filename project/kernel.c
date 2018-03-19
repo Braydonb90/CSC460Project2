@@ -1,9 +1,7 @@
 #include <string.h>
-#include <stdarg.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
-#include "uart.h"
 #include "kernel.h"
 
 
@@ -95,7 +93,7 @@ volatile static PD* Cp;
  * The currently assigned request info, waiting to be processed
  * Requests aren't always associated with a task, so need to have this
  */
-static KERNEL_REQUEST_PARAM current_request;
+static KERNEL_REQUEST_PARAM* current_request;
 
 /* 
  * Since this is a "full-served" model, the kernel is executing using its own
@@ -123,9 +121,15 @@ volatile static unsigned int KernelActive;
 /* number of tasks created so far */
 volatile static unsigned int Tasks;  
 
+/* number of Ticks since system start */
+/* at 10ms per tick, should take ~497 days to overflow */ 
+static TICK Elapsed;
+
 static ProcessQ periodic_q;
 static ProcessQ system_q;
 static ProcessQ rr_q;
+
+BOOL idling;
 
 
 /****Start of Implementation****/
@@ -183,11 +187,17 @@ static void Kernel_Create_Task()
         if (Process[x].state == DEAD) break;
     }
     if(x < MAXTHREAD) {
-        Kernel_Create_Task_At(Process + x, current_request.code);
+        Kernel_Create_Task_At(Process + x, current_request->code);
         
-        Process[x].arg = current_request.arg;
-        Process[x].priority = current_request.priority;
+        Process[x].arg = current_request->arg;
+        Process[x].priority = current_request->priority;
         Process[x].pid = x;
+        
+        //need to pass back pid. PD holds copy of param struct for safety reasons
+        //so current_request pointer needs to be assigned to
+        current_request->pid = x;
+        
+
 
         switch (Process[x].priority){
             case SYSTEM:
@@ -217,32 +227,46 @@ static void Dispatch()
 {
     //put current process back in queue, if relevant
     //if the request was terminate, Cp should already be dead    
-    if (Cp->state != DEAD) {
-        if(current_request.request_type == TERMINATE) {
-            OS_Abort(INVALID_TERMINATE);
-        }
-        Cp->state = READY;
-        switch(Cp->priority) {
-            case SYSTEM:
+    switch(Cp->priority) {
+        case SYSTEM:
+            //only push system task if it isn't dead
+            if(Cp->state != DEAD) {
+                Cp->state = READY;
                 Q_Push(&system_q, (PD*)Cp);
+            }
+            else if (Cp->state == DEAD){
                 break;
-            case PERIODIC:
-                Q_Insert(&periodic_q, (PD*)Cp);
-                break;
-            case RR:
+            }
+            else{
+                OS_Abort(INVALID_STATE_DISPATCH);
+            }
+            break;
+        case PERIODIC:
+            Q_Insert(&periodic_q, (PD*)Cp);
+            break;
+        case RR:
+            if(Cp->state != DEAD){
+                Cp->state = READY;
                 Q_Push(&rr_q, (PD*)Cp);
-                break;
-            case -1:
-                break;
-            default:
-                OS_Abort(INVALID_PRIORITY_DISPATCH);
-                break;
-        }
-    } 
+            }
+            break;
+        case -1:
+            break;
+        default:
+            OS_Abort(INVALID_PRIORITY_DISPATCH);
+            break;
+    }
+    idling = FALSE;
+    Cp = NULL;
     //find new process 
     if (system_q.length > 0) {
         Cp = Q_Pop(&system_q);
-        Cp->state = RUNNING;
+        if(Cp == NULL) {
+            OS_Abort(QUEUE_ERROR);
+        }
+        else {
+            Cp->state = RUNNING;
+        }
     }
     else if(periodic_q.length > 0) {
         Cp = Q_Pop(&periodic_q);
@@ -253,7 +277,12 @@ static void Dispatch()
         Cp->state = RUNNING;
     }
     else {
+        idling = TRUE;
         Cp = &idle_process;
+    }
+
+    if(!idling) {
+        BIT_RESET(PORTB, DEBUG_PIN);
     }
 }
 
@@ -275,10 +304,10 @@ static void Kernel_Next_Request()
 
         /* save the Cp's stack pointer */
         Cp->sp = CurrentSp;
-       // Blink_Pin(CLOCK_PIN, current_request.request_type);
-
-       // _delay_ms(500);
-        switch(current_request.request_type){
+        if(current_request == NULL) {
+            OS_Abort(NULL_REQUEST);
+        }
+        switch(current_request->request_type){
             case CREATE:
                 Kernel_Create_Task();
                 break;
@@ -294,17 +323,29 @@ static void Kernel_Next_Request()
                 Dispatch();
                 break;
             case TIMER_TICK:
-                //Only time we do anything is if task is RR?
-                Dispatch();
+                //SYSTEM should never need an interrupt to switch (some timeout is a good idea?)
+                //PERIODIC should update here, and dispatch if past wcet
+                //RR is lowest priority, so dispatch immediately here
+                if(idling || Cp->priority != SYSTEM) { 
+                    Dispatch();
+                }
                 break;
             default:
                 /* Houston! we have a problem here! */
                 OS_Abort(INVALID_REQUEST);
                 break;
         }
-        current_request.request_type = NONE;
+        current_request = NULL;
     } 
 }
+
+int Kernel_GetArg() {
+    return Cp->arg;
+}
+PID Kernel_GetPid() {
+    return Cp->pid;
+}
+
 
 
 /*
@@ -317,13 +358,11 @@ static void Kernel_Request_Terminate() {
     Tasks--;
 }
     
-//The only "public" function
-void Kernel_Request(KERNEL_REQUEST_PARAM krp) {
+//The main interface between the kernel and the user level
+void Kernel_Request(KERNEL_REQUEST_PARAM* krp) {
     if(KernelActive) {
         Disable_Interrupt();
-        //why am I storing this???
-        //to pass values back
-        Cp->request_param = krp;
+        Cp->request_param = *krp;
         current_request = krp;
 
         Enter_Kernel();
@@ -364,53 +403,25 @@ static void Setup_System_Clock()
 ISR(TIMER4_COMPA_vect)
 {
     if (KernelActive) {
-//        BIT_TOGGLE(PORTB, CLOCK_PIN);
+        BIT_TOGGLE(PORTB, CLOCK_PIN);
+        
 
         // Need to indicate that this is just a tick, for the likely case that 
         // the Cp doesn't need to get switched
         // There should not be any current request at this point
         // but if there is????
+        // Shouldn't be possible, as any request should immediately disable interrupts
+        if(current_request != NULL) {
+            OS_Abort(NON_NULL_REQUEST);
+        }
         KERNEL_REQUEST_PARAM prm;
         prm.request_type = TIMER_TICK; 
 
-        current_request = prm;
+        current_request = &prm;
 
         Enter_Kernel();
     }
         
-}
-
-/*
- * Basic debugging function to blink LED corresponding to list of values
- */
-void debug_break(int argcount, ...) {
-    Disable_Interrupt();
-    if(argcount > 20) {
-        while(TRUE);
-    }
-
-    int buffer[20], i, num;
-    va_list args;
-    va_start(args, argcount);
-    for(i = 0; i < argcount; i++) {
-        buffer[i] = va_arg(args, int);
-    }
-    va_end(args);
-    while(TRUE) {
-        for(i = 0; i < argcount; i++) { 
-            num = buffer[i];
-            _delay_ms(500);
-            if(num > 10 ||  num < 0) {
-                BIT_SET(PORTB, CLOCK_PIN);
-                _delay_ms(500);
-                BIT_RESET(PORTB, CLOCK_PIN);
-            }
-            else{
-                Blink_Pin(CLOCK_PIN, num);
-            }
-        }
-        _delay_ms(1000);
-    }
 }
 
 /*================
@@ -426,9 +437,12 @@ void Kernel_Init()
 {
     int x;
     Tasks = 0;
+    Elapsed = 0;
+    idling = FALSE;
     KernelActive = 0;
     NextP = 0;
 
+    BIT_SET(DDRB, DEBUG_PIN);
     BIT_SET(DDRB, CLOCK_PIN);
     BIT_SET(DDRB, ERROR_PIN);
 
@@ -449,23 +463,25 @@ void Kernel_Init()
     Kernel_Create_Task_At(&idle_process, Kernel_Idle_Task);
     idle_process.priority = -1;
 
-
-
     //Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXTHREAD; x++) {
         memset(&(Process[x]),0,sizeof(PD));
         Process[x].state = DEAD;
     }
-    current_request = prm;
+    current_request = &prm;
+    Kernel_Create_Task();
+    current_request = NULL;
 }
 
   
 /*
- * This function starts the RTOS after creating a few tasks.
+ * This function starts the RTOS
  */
 void Kernel_Start() 
 {   
     if ( (! KernelActive) && (Tasks > 0)) {
+        //Idle task shouldn't be counted, as it doesn't take a slot in the PD array
+        Tasks = 0;
         Disable_Interrupt();
 
         /* here we go...  */
@@ -480,10 +496,13 @@ void Kernel_Start()
  */
 void Kernel_Idle_Task() {
     for (;;) {
-        //TODO Toggle some pin here
-        if(current_request.request_type != NONE) {
-            Enter_Kernel();
+        idling = TRUE;
+        BIT_TOGGLE(PORTB, DEBUG_PIN);
+        //TODO decide if this should be here, or if tick ISR should check for outstanding requests
+        if(current_request != NULL) {
+            OS_Abort(DEBUG_IDLE_HALT);
         }
+        _delay_ms(200);
     }
 }
 

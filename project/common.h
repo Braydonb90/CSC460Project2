@@ -38,7 +38,12 @@ typedef enum error_code {
     INVALID_REQUEST = 1,
     INVALID_PRIORITY_CREATE,
     INVALID_PRIORITY_DISPATCH,
+    INVALID_STATE_DISPATCH,
     INVALID_TERMINATE,
+    DEBUG_IDLE_HALT,
+    NULL_REQUEST,
+    NON_NULL_REQUEST,
+    QUEUE_ERROR,
     NO_DEAD_PDS
 } ERROR_CODE;    
 /*
@@ -61,6 +66,9 @@ typedef struct kernel_request_param
     PID pid;                            //PID returned by kernel on creation etc.
     KERNEL_REQUEST_TYPE request_type;   //type of request
     voidfuncptr code;                    //code associated with process
+    TICK wcet;
+    TICK period;
+    TICK offset;
     PRIORITY priority;
     int arg;    
 } KERNEL_REQUEST_PARAM;
@@ -74,6 +82,8 @@ typedef struct kernel_request_param
 #define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
 #define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
 #define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
+#define Disable_Interrupt()		asm volatile ("cli"::)
+#define Enable_Interrupt()		asm volatile ("sei"::)
 
 /********************/
 
@@ -81,10 +91,11 @@ typedef struct kernel_request_param
 
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
-#define MSECPERTICK   100   // resolution of a system TICK in milliseconds
-#define BLINKDELAY 100
+#define MSECPERTICK   10   // resolution of a system TICK in milliseconds
+#define BLINKDELAY 150
 
-//shouldn't matter that these are the same
+//These pins are on port B
+#define DEBUG_PIN 3
 #define ERROR_PIN 4
 #define CLOCK_PIN 5
 

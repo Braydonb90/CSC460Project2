@@ -1,5 +1,7 @@
 #include "process_queue.h"
 
+static PD* Q_Pop_Internal(ProcessQ* q);
+
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
     q->front = NULL;
     q->back = NULL;
@@ -10,7 +12,7 @@ ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
 }
 
 /*
- * for RR tasks
+ * for RR and system tasks
  */
 void Q_Push(ProcessQ* q, PD* pd) {
     if (q->length == 0) {
@@ -25,8 +27,38 @@ void Q_Push(ProcessQ* q, PD* pd) {
         q->length++;
     }
 }
-
+/*
+ * Cycles through Q, returning the first READY task
+ */
 PD* Q_Pop(ProcessQ* q) {
+    int len = q->length,i;
+    PD* prev = q->front;
+    PD* cur = prev->next;
+    //in case the front is actually ready
+    if(prev->state == READY){
+        q->front = cur;
+        q->length--;
+        return prev;
+    }
+    //otherwise
+    while(cur != NULL){
+        if(cur->state == READY){
+            prev->next = cur->next;
+            cur->next = NULL;
+            q->length--;
+            return cur;
+        }
+        prev = cur;
+        cur = cur->next;
+    }
+            
+    return NULL;
+}
+
+/*
+ * Standard q pop. Only used internally... or not used
+ */
+static PD* Q_Pop_Internal(ProcessQ* q) {
     if (q->length == 0) {
         return NULL;
     }
