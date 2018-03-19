@@ -1,9 +1,8 @@
 #include "os.h"
 
 void OS_Abort(unsigned int error) {
-    BIT_SET(DDRB, ERROR_PIN);
     while(TRUE) {
-        Blink_Pin(ERROR_PIN, error);
+        Blink_Pin(OUTPUT_PORT, error);
         _delay_ms(1000); 
     }
 }
@@ -20,34 +19,33 @@ void OS_Init(void) {
  *   MEDIUM   -- Periodic tasks,
  *   LOWEST   -- Round-Robin (RR) tasks
  */
-
-PID   Task_Create_System(voidfuncptr f, int arg) {
-    KERNEL_REQUEST_PARAM prm;
+ 
+PID Task_Create(voidfuncptr f, PRIORITY p, int arg, TICK period, TICK wcet, TICK offset) {
+	KERNEL_REQUEST_PARAM prm;
     prm.request_type = CREATE;
-    prm.priority = SYSTEM;
+    prm.priority = p;
     prm.code = f;
     prm.arg = arg;
+	prm.period = period;
+	prm.wcet = wcet;
+	prm.offset = offset;
 
     Kernel_Request(&prm);
     return prm.pid;
 }
-PID   Task_Create_RR(voidfuncptr f, int arg) {
-    KERNEL_REQUEST_PARAM prm;
-    prm.request_type = CREATE;
-    prm.priority = RR;
-    prm.code = f;
-    prm.arg = arg;
 
-    Kernel_Request(&prm);
-    //Cant call getpid, since that only gets the current task's pid
-    return prm.pid;
+PID   Task_Create_System(voidfuncptr f, int arg) {
+    return Task_Create(f, SYSTEM, arg, NULL, NULL, NULL);
+}
+PID   Task_Create_RR(voidfuncptr f, int arg) {
+    return Task_Create(f, RR, arg, NULL, NULL, NULL);
 }
 
 /*
  * returns 0 if not successful; otherwise a non-zero PID.
  */
 PID   Task_Create_Period(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset) {
-    //TODO
+    return Task_Create(f, PERIODIC, arg, period, wcet, offset);
 }
 
 /*
@@ -79,6 +77,10 @@ int  Task_GetArg(void) {
  */
 PID  Task_Pid(void) {
     return Kernel_GetPid();
+}
+
+unsigned int Now() {
+	return Kernel_GetElapsed() * MSECPERTICK + TCNT4/62.5; //62.5 per millisecond
 }
 
 

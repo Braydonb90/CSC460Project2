@@ -73,7 +73,30 @@ static PD* Q_Pop_Internal(ProcessQ* q) {
  * for periodic tasks
  */
 void Q_Insert(ProcessQ* q, PD* pd) {
-    //TODO
+    if (q->length == 0) {
+        pd->next = NULL;
+        q->front = pd;
+        q->back = pd;
+    }
+    else {
+		PD* cur = q->front;
+		
+		while(cur != NULL) {
+			if(pd->next_start < cur->next_start) {
+				pd->next = cur;
+				if(cur->pid == q->front->pid) {
+					q->front = pd;
+				}
+				break;
+			}
+			cur = cur->next;
+		}
+		if(cur == NULL) { // Ran through queue and found no spots to insert, append to end
+			q->back->next = pd;
+			q->back = pd;
+		}
+    }
+    q->length++;
 }
 
 

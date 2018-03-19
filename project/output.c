@@ -7,11 +7,10 @@ static void debug_blink_array(int count, int* arr);
 
 void Blink_Pin(unsigned int pin, unsigned int num){
     int i;
-    BIT_RESET(PORTB, pin);
+    BIT_SET(OUTPUT_PORT_INIT, pin);
+    BIT_RESET(OUTPUT_PORT, pin);
     for(i = 0; i < num; i++){
-        BIT_SET(PORTB, pin);
-        _delay_ms(BLINKDELAY);
-        BIT_RESET(PORTB, pin);
+        BIT_TOGGLE(OUTPUT_PORT, pin);
         _delay_ms(BLINKDELAY);
     }
 }
@@ -51,9 +50,9 @@ static void debug_blink_array(int count, int* arr) {
         num = arr[i];
         _delay_ms(500);
         if(num > 10 ||  num < 0) {
-            BIT_SET(PORTB, DEBUG_PIN);
+            BIT_SET(OUTPUT_PORT, DEBUG_PIN);
             _delay_ms(500);
-            BIT_RESET(PORTB, DEBUG_PIN);
+            BIT_RESET(OUTPUT_PORT, DEBUG_PIN);
         }
         else{
             Blink_Pin(DEBUG_PIN, num);
