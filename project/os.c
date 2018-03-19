@@ -35,14 +35,14 @@ PID Task_Create(voidfuncptr f, PRIORITY p, int arg, TICK period, TICK wcet, TICK
 }
 
 PID   Task_Create_System(voidfuncptr f, int arg) {
-    return Task_Create(f, SYSTEM, arg, NULL, NULL, NULL);
+    return Task_Create(f, SYSTEM, arg, 0, 0, 0);
 }
 PID   Task_Create_RR(voidfuncptr f, int arg) {
-    return Task_Create(f, RR, arg, NULL, NULL, NULL);
+    return Task_Create(f, RR, arg, 0, 0, 0);
 }
 
 /*
- * returns 0 if not successful; otherwise a non-zero PID.
+ * returns 0 if not successful; otherwise a non-zero PID. -- //TODO PID 0 not valid?
  */
 PID   Task_Create_Period(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset) {
     return Task_Create(f, PERIODIC, arg, period, wcet, offset);

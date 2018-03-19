@@ -207,7 +207,7 @@ static void Kernel_Create_Task()
 				Process[x].wcet = current_request->wcet;
 				Process[x].period = current_request->period;
 				Process[x].next_start = Elapsed + current_request->offset;
-				Process[x].state = WAITING;
+				Process[x].state = READY;
                 Q_Insert(&periodic_q, Process + x);
                 break;
             case RR:
@@ -265,7 +265,7 @@ static void Dispatch()
     Cp = NULL;
     //find new process 
     if (system_q.length > 0) {
-        Cp = Q_Pop(&system_q);
+        Cp = Q_Pop_Ready(&system_q);
         if(Cp == NULL) {
             OS_Abort(QUEUE_ERROR);
         }
@@ -274,14 +274,14 @@ static void Dispatch()
         }
     }
     else if(periodic_q.length > 0) {
-        Cp = Q_Pop(&periodic_q);
-		if(Cp->next->state == READY) {
-			OS_Abort(TIMING_VIOLATION);
-		}
-        Cp->state = RUNNING;
+        PD* check = Q_Peek(&periodic_q);
+        if(check->next_start <= Elapsed){
+            Cp = Q_Pop(&periodic_q);
+            Cp->state = RUNNING;
+        }
     }
-    else if(rr_q.length > 0) {
-        Cp = Q_Pop(&rr_q);
+    if(Cp == NULL && rr_q.length > 0) {
+        Cp = Q_Pop_Ready(&rr_q);
         Cp->state = RUNNING;
     }
     else {
@@ -334,8 +334,11 @@ static void Kernel_Next_Request()
                 //SYSTEM should never need an interrupt to switch (some timeout is a good idea?)
                 //PERIODIC should update here, and dispatch if past wcet
                 //RR is lowest priority, so dispatch immediately here
-                if(idling || Cp->priority != SYSTEM) { 
+                if(idling || Cp->priority == RR) { 
                     Dispatch();
+                }
+                else if(Cp->priority == PERIODIC){
+                //    Dispatch()
                 }
                 break;
             default:
@@ -413,7 +416,7 @@ static void Setup_System_Clock()
 ISR(TIMER4_COMPA_vect)
 {
     if (KernelActive) {
-        BIT_SET(OUTPUT_PORT, CLOCK_PIN);
+        BIT_TOGGLE(OUTPUT_PORT, CLOCK_PIN);
 		Elapsed++;
 		
 		PD* pt = periodic_q.front;
@@ -444,8 +447,8 @@ ISR(TIMER4_COMPA_vect)
         prm.request_type = TIMER_TICK; 
 
         current_request = &prm;
+        debug_break(3,1,2,1);
 
-        BIT_RESET(OUTPUT_PORT, CLOCK_PIN);
         Enter_Kernel();
     }
         

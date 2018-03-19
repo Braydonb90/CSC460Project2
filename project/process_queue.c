@@ -30,7 +30,7 @@ void Q_Push(ProcessQ* q, PD* pd) {
 /*
  * Cycles through Q, returning the first READY task
  */
-PD* Q_Pop(ProcessQ* q) {
+PD* Q_Pop_Ready(ProcessQ* q) {
     int len = q->length,i;
     PD* prev = q->front;
     PD* cur = prev->next;
@@ -54,6 +54,18 @@ PD* Q_Pop(ProcessQ* q) {
             
     return NULL;
 }
+/*
+ * Regular pop
+ */
+PD* Q_Pop(ProcessQ* q) {
+    if(q->front == NULL)
+        return NULL;
+
+    PD* ret = q->front;
+    q->front = q->front->next;
+    q->length--;
+    return ret;
+}
 
 /*
  * Standard q pop. Only used internally... or not used
@@ -69,8 +81,12 @@ static PD* Q_Pop_Internal(ProcessQ* q) {
     return ret;
 }
 
+PD* Q_Peek(ProcessQ* q){
+    return q->front;
+}
 /*
  * for periodic tasks
+ * inserts at the appropriate point in the q
  */
 void Q_Insert(ProcessQ* q, PD* pd) {
     if (q->length == 0) {
@@ -78,25 +94,29 @@ void Q_Insert(ProcessQ* q, PD* pd) {
         q->front = pd;
         q->back = pd;
     }
+    else if(pd->next_start < q->front->next_start){
+        pd->next = q->front;
+        q->front = pd;
+        q->length++;
+    }
     else {
-		PD* cur = q->front;
-		
+        PD* prev = q->front;
+		PD* cur = q->front->next;
+	    	
 		while(cur != NULL) {
 			if(pd->next_start < cur->next_start) {
+                prev->next = pd;
 				pd->next = cur;
-				if(cur->pid == q->front->pid) {
-					q->front = pd;
-				}
-				break;
+                q->length++;
+                return;
 			}
+            prev = cur;
 			cur = cur->next;
 		}
-		if(cur == NULL) { // Ran through queue and found no spots to insert, append to end
-			q->back->next = pd;
-			q->back = pd;
-		}
+        q->back->next = pd;
+        q->back = pd;
+        q->length++;
     }
-    q->length++;
 }
 
 

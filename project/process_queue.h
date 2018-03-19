@@ -21,8 +21,8 @@ typedef struct ProcessDescriptor
     struct ProcessDescriptor* next;
 	
 	// Only used for periodic tasks
-	TICK remaining; 
-	TICK next_start;
+	TICK remaining; //remaining allowed execution time
+	TICK next_start;//tick at which this task is next scheduled
 	
     TICK wcet;
     TICK period;
@@ -40,6 +40,7 @@ typedef struct ProcessQueue {
     
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type);
 void Q_Push(ProcessQ* q, PD* pd);
+PD* Q_Pop_Ready(ProcessQ* q);
 PD* Q_Pop(ProcessQ* q);
 void Q_Insert(ProcessQ* q, PD* pd);
 

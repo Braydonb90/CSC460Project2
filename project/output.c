@@ -10,7 +10,9 @@ void Blink_Pin(unsigned int pin, unsigned int num){
     BIT_SET(OUTPUT_PORT_INIT, pin);
     BIT_RESET(OUTPUT_PORT, pin);
     for(i = 0; i < num; i++){
-        BIT_TOGGLE(OUTPUT_PORT, pin);
+        BIT_SET(OUTPUT_PORT, pin);
+        _delay_ms(BLINKDELAY);
+        BIT_RESET(OUTPUT_PORT, pin);
         _delay_ms(BLINKDELAY);
     }
 }
