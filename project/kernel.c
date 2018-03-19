@@ -204,6 +204,10 @@ static void Kernel_Create_Task()
                 Q_Push(&system_q, Process + x);
                 break;
             case PERIODIC:
+				Process[x].wcet = current_request->wcet;
+				Process[x].period = current_request->period;
+				Process[x].next_start = Elapsed + current_request->offset;
+				Process[x].state = WAITING;
                 Q_Insert(&periodic_q, Process + x);
                 break;
             case RR:
@@ -245,6 +249,7 @@ static void Dispatch()
             Q_Insert(&periodic_q, (PD*)Cp);
             break;
         case RR:
+		// RR Task needs to be at beginning of queue if preempted
             if(Cp->state != DEAD){
                 Cp->state = READY;
                 Q_Push(&rr_q, (PD*)Cp);
@@ -270,6 +275,9 @@ static void Dispatch()
     }
     else if(periodic_q.length > 0) {
         Cp = Q_Pop(&periodic_q);
+		if(Cp->next->state == READY) {
+			OS_Abort(TIMING_VIOLATION);
+		}
         Cp->state = RUNNING;
     }
     else if(rr_q.length > 0) {
@@ -282,7 +290,7 @@ static void Dispatch()
     }
 
     if(!idling) {
-        BIT_RESET(PORTB, DEBUG_PIN);
+        BIT_RESET(OUTPUT_PORT, IDLE_PIN);
     }
 }
 
@@ -346,7 +354,9 @@ PID Kernel_GetPid() {
     return Cp->pid;
 }
 
-
+TICK Kernel_GetElapsed() {
+	return Elapsed;
+}
 
 /*
  * Task has requested to be terminated. Need to clear mem and set to DEAD
@@ -403,8 +413,24 @@ static void Setup_System_Clock()
 ISR(TIMER4_COMPA_vect)
 {
     if (KernelActive) {
-        BIT_TOGGLE(PORTB, CLOCK_PIN);
-        
+        BIT_SET(OUTPUT_PORT, CLOCK_PIN);
+		Elapsed++;
+		
+		PD* pt = periodic_q.front;
+		
+		while(pt != NULL) {
+			pt->next_start--;
+			if(pt->next_start <= 0) {
+				pt->state = READY;
+			}
+			if(pt->state == RUNNING) {
+				pt->remaining--;
+			}
+			if(pt->remaining <= 0) {
+				pt->state = WAITING;
+			}
+			PD* pt = pt->next;
+		}
 
         // Need to indicate that this is just a tick, for the likely case that 
         // the Cp doesn't need to get switched
@@ -419,6 +445,7 @@ ISR(TIMER4_COMPA_vect)
 
         current_request = &prm;
 
+        BIT_RESET(OUTPUT_PORT, CLOCK_PIN);
         Enter_Kernel();
     }
         
@@ -442,9 +469,10 @@ void Kernel_Init()
     KernelActive = 0;
     NextP = 0;
 
-    BIT_SET(DDRB, DEBUG_PIN);
-    BIT_SET(DDRB, CLOCK_PIN);
-    BIT_SET(DDRB, ERROR_PIN);
+    BIT_SET(OUTPUT_PORT_INIT, IDLE_PIN);
+    BIT_SET(OUTPUT_PORT_INIT, CLOCK_PIN);
+    BIT_SET(OUTPUT_PORT_INIT, ERROR_PIN);
+    BIT_SET(OUTPUT_PORT_INIT, DEBUG_PIN);
 
     Q_Init(&system_q, SYSTEM);
     Q_Init(&periodic_q, PERIODIC);
@@ -497,7 +525,7 @@ void Kernel_Start()
 void Kernel_Idle_Task() {
     for (;;) {
         idling = TRUE;
-        BIT_TOGGLE(PORTB, DEBUG_PIN);
+        BIT_TOGGLE(OUTPUT_PORT, IDLE_PIN);
         //TODO decide if this should be here, or if tick ISR should check for outstanding requests
         if(current_request != NULL) {
             OS_Abort(DEBUG_IDLE_HALT);

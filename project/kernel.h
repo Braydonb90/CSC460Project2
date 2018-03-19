@@ -6,6 +6,7 @@
 #include "process_queue.h"
 #include "os.h"
 
+TICK Kernel_GetElapsed();
 
 /*
  * external "main" function. first task to run, and should initialize the starting tasks

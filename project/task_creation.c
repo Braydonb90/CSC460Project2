@@ -4,8 +4,9 @@
 
 #include "os.h"
 
-#define TEST_SYSTEM
-#define TEST_RR
+//#define TEST_SYSTEM
+//#define TEST_RR
+#define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
 
@@ -20,14 +21,13 @@
 void Task_Ping_RR() 
 {
     int  x ;
-    BIT_SET(DDRA, 6);
+    BIT_SET(RR_PORT_INIT, 0);
     for(;;){
         //LED off
-        BIT_SET(PORTA, 6);
+        BIT_SET(RR_PORT, 0);
         _delay_ms(400);
 
-        BIT_RESET(PORTA, 6);
-        _delay_ms(400);
+        BIT_RESET(RR_PORT, 0);
     }
 }
 
@@ -38,14 +38,47 @@ void Task_Ping_RR()
 void Task_Pong_RR() 
 {
     int  x;
-    BIT_SET(DDRB, 6);
+    BIT_SET(RR_PORT_INIT, 1);
     for(;;) {
         //LED on
-        BIT_SET(PORTB, 6);
+        BIT_SET(RR_PORT, 1);
         _delay_ms(200);
 
-        BIT_RESET(PORTB, 6);
+        BIT_RESET(RR_PORT, 1);
+    }
+}
+
+
+/*
+ * A cooperative "Ping" task.
+ */
+void Task_Ping_Periodic() 
+{
+    int  x ;
+    BIT_SET(PERIODIC_PORT_INIT, 0);
+    for(;;){
+        //LED off
+        BIT_SET(PERIODIC_PORT, 0);
+        _delay_ms(400);
+
+        BIT_RESET(PERIODIC_PORT, 0);
+    }
+}
+
+
+/*
+ * A cooperative "Pong" task.
+ */
+void Task_Pong_Periodic() 
+{
+    int  x;
+    BIT_SET(PERIODIC_PORT_INIT, 1);
+    for(;;) {
+        //LED on
+        BIT_SET(PERIODIC_PORT, 1);
         _delay_ms(200);
+
+        BIT_RESET(PERIODIC_PORT, 1);
     }
 }
 /*
@@ -56,15 +89,14 @@ void Task_Ping_System()
 {
     int  arg = Task_GetArg();
     int i;
-    BIT_SET(DDRA, 6);
+    BIT_SET(SYSTEM_PORT_INIT, 0);
     if(arg <= 0) {
         for(;;) {
             //LED on
-            BIT_SET(PORTB, 6);
+            BIT_SET(SYSTEM_PORT, 0);
             _delay_ms(400);
 
-            BIT_RESET(PORTB, 6);
-            _delay_ms(400);
+            BIT_RESET(SYSTEM_PORT, 0);
 
             Task_Next();
         }
@@ -72,11 +104,10 @@ void Task_Ping_System()
     else {
         for(i = 0; i<arg; i++){
             //LED off
-            BIT_SET(PORTA, 6);
+            BIT_SET(SYSTEM_PORT, 0);
             _delay_ms(400);
 
-            BIT_RESET(PORTA, 6);
-            _delay_ms(400);
+            BIT_RESET(SYSTEM_PORT, 0);
 
             Task_Next();
         }
@@ -92,15 +123,14 @@ void Task_Pong_System()
 {
     int  arg = Task_GetArg();
     int i;
-    BIT_SET(DDRB, 6);
+    BIT_SET(SYSTEM_PORT_INIT, 1);
     if(arg <= 0) {
         for(;;) {
             //LED on
-            BIT_SET(PORTB, 6);
+            BIT_SET(SYSTEM_PORT, 1);
             _delay_ms(200);
 
-            BIT_RESET(PORTB, 6);
-            _delay_ms(200);
+            BIT_RESET(SYSTEM_PORT, 1);
 
             Task_Next();
         }
@@ -108,11 +138,10 @@ void Task_Pong_System()
     else {
         for(i = 0; i < arg; i++) {
             //LED on
-            BIT_SET(PORTB, 6);
+            BIT_SET(SYSTEM_PORT, 1);
             _delay_ms(200);
 
-            BIT_RESET(PORTB, 6);
-            _delay_ms(200);
+            BIT_RESET(SYSTEM_PORT, 1);
 
             Task_Next();
         }
@@ -126,11 +155,14 @@ void user_main() {
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 
 #endif
 #ifdef TEST_SYSTEM
-    int p3 = Task_Create_System(Task_Ping_System, 8);
-    int p4 = Task_Create_System(Task_Pong_System, 3);
+    int p3 = Task_Create_System(Task_Ping_System, 0);
+    int p4 = Task_Create_System(Task_Pong_System, 0);
+#endif
+#ifdef TEST_PERIODIC
+    int p5 = Task_Create_Period(Task_Ping_Periodic, 0, 200, 100, 0); // Period of 2 seconds, WCET of 1 second
 #endif
 #if defined TEST_SYSTEM && defined TEST_RR && defined TEST_PID_CREATE
-    debug_break(4, p1,p2,p3,p4);
+    //debug_break(4, p1,p2,p3,p4);
 #endif
 }
 

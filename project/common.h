@@ -28,7 +28,9 @@ typedef enum process_state
 { 
     DEAD = 0, 
     READY, 
-    RUNNING 
+    RUNNING,
+	WAITING,
+	BLOCKED
 } PROCESS_STATE;
 
 /*
@@ -44,7 +46,8 @@ typedef enum error_code {
     NULL_REQUEST,
     NON_NULL_REQUEST,
     QUEUE_ERROR,
-    NO_DEAD_PDS
+    NO_DEAD_PDS,
+	TIMING_VIOLATION
 } ERROR_CODE;    
 /*
  * This is the set of kernel requests, i.e., a request code for each system call.
@@ -95,9 +98,25 @@ typedef struct kernel_request_param
 #define BLINKDELAY 150
 
 //These pins are on port B
-#define DEBUG_PIN 3
-#define ERROR_PIN 4
+#define OUTPUT_PORT_INIT DDRB
+#define OUTPUT_PORT PORTB
+
+#define ERROR_PIN 7
+#define IDLE_PIN 6
 #define CLOCK_PIN 5
+#define DEBUG_PIN 4
+
+//System Tasks on Port A 22(0)-29(7)
+#define SYSTEM_PORT_INIT DDRA
+#define SYSTEM_PORT PORTA
+
+//Periodic Tasks on Port C 37(0)-30(7)
+#define PERIODIC_PORT_INIT DDRC
+#define PERIODIC_PORT PORTC
+
+//Round Robin Tasks on Port L 49(0)-42(7)
+#define RR_PORT_INIT DDRL
+#define RR_PORT PORTL
 
 #ifndef NULL
 #define NULL          0   /* undefined */

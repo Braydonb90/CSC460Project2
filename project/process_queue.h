@@ -14,11 +14,20 @@ typedef struct ProcessDescriptor
     unsigned char workSpace[WORKSPACE]; 
     volatile PROCESS_STATE state;
     voidfuncptr  code;   /* function to be executed as a task */
-    KERNEL_REQUEST_PARAM request_param; //Any reason to store this here?
     PRIORITY priority;
     int arg;
     PID pid;
+    KERNEL_REQUEST_PARAM request_param; //Any reason to store this here?
     struct ProcessDescriptor* next;
+	
+	// Only used for periodic tasks
+	TICK remaining; 
+	TICK next_start;
+	
+    TICK wcet;
+    TICK period;
+    TICK offset;
+	
 } PD;
 
 typedef struct ProcessQueue {
