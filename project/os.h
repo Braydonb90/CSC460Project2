@@ -111,8 +111,6 @@ void Msg_ASend( PID  id, MTYPE t, unsigned int v );
  */
 unsigned int Now();  // number of milliseconds since the RTOS boots.
 
-
-
 /*
  * Booting:
  *  The RTOS and the main application are compiled into a single executable binary, but

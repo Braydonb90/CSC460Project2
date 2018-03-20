@@ -130,6 +130,7 @@ static ProcessQ system_q;
 static ProcessQ rr_q;
 
 BOOL idling;
+BOOL do_break = FALSE;
 
 
 /****Start of Implementation****/
@@ -197,8 +198,6 @@ static void Kernel_Create_Task()
         //so current_request pointer needs to be assigned to
         current_request->pid = x;
         
-
-
         switch (Process[x].priority){
             case SYSTEM:
                 Q_Push(&system_q, Process + x);
@@ -275,20 +274,22 @@ static void Dispatch()
     }
     else if(periodic_q.length > 0) {
         PD* check = Q_Peek(&periodic_q);
-        if(check->next_start <= Elapsed){
+        if(check != NULL && check->next_start <= Elapsed){
             Cp = Q_Pop(&periodic_q);
             Cp->state = RUNNING;
         }
     }
+
+    //do RR
     if(Cp == NULL && rr_q.length > 0) {
         Cp = Q_Pop_Ready(&rr_q);
         Cp->state = RUNNING;
     }
-    else {
+    
+    if(Cp == NULL) {
         idling = TRUE;
         Cp = &idle_process;
     }
-
     if(!idling) {
         BIT_RESET(OUTPUT_PORT, IDLE_PIN);
     }
@@ -299,7 +300,7 @@ static void Dispatch()
  */
 static void Kernel_Next_Request() 
 {
-   Dispatch();  /* select a new task to run */
+    Dispatch();  /* select a new task to run */
 
     while(1) {
         Cp->request_param.request_type = NONE; /* clear its request */
@@ -322,6 +323,10 @@ static void Kernel_Next_Request()
             case NEXT:
             case NONE:
                 /* NONE could be caused by a timer interrupt --- this is no longer true */
+                if(Cp->priority == PERIODIC) {
+                    Cp->next_start = Cp->next_start + Cp->period;
+                    Cp->state = READY;
+                }
                 Cp->state = READY;
                 Dispatch();
                 break;
@@ -338,7 +343,7 @@ static void Kernel_Next_Request()
                     Dispatch();
                 }
                 else if(Cp->priority == PERIODIC){
-                //    Dispatch()
+                    OS_Abort(PERIODIC_OVERUSE);
                 }
                 break;
             default:
@@ -365,10 +370,13 @@ TICK Kernel_GetElapsed() {
  * Task has requested to be terminated. Need to clear mem and set to DEAD
  */
 static void Kernel_Request_Terminate() {
-    //This cast shushes compiler. Assuming it's ok?
-    memset((PD*)Cp, 0, sizeof(PD));
-    Cp->state = DEAD;
-    Tasks--;
+    // periodic tasks are rescheduled after termination
+    if(Cp->priority != PERIODIC){
+        //This cast shushes compiler. Assuming it's ok?
+        memset((PD*)Cp, 0, sizeof(PD));
+        Tasks--;
+        Cp->state = DEAD;
+    }
 }
     
 //The main interface between the kernel and the user level
@@ -419,22 +427,6 @@ ISR(TIMER4_COMPA_vect)
         BIT_TOGGLE(OUTPUT_PORT, CLOCK_PIN);
 		Elapsed++;
 		
-		PD* pt = periodic_q.front;
-		
-		while(pt != NULL) {
-			pt->next_start--;
-			if(pt->next_start <= 0) {
-				pt->state = READY;
-			}
-			if(pt->state == RUNNING) {
-				pt->remaining--;
-			}
-			if(pt->remaining <= 0) {
-				pt->state = WAITING;
-			}
-			PD* pt = pt->next;
-		}
-
         // Need to indicate that this is just a tick, for the likely case that 
         // the Cp doesn't need to get switched
         // There should not be any current request at this point
@@ -447,7 +439,6 @@ ISR(TIMER4_COMPA_vect)
         prm.request_type = TIMER_TICK; 
 
         current_request = &prm;
-        debug_break(3,1,2,1);
 
         Enter_Kernel();
     }

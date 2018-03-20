@@ -3,14 +3,17 @@
  *************************/
 
 #include <util/delay.h>
+#include "common.h"
 #include "os.h"
 
+//delay function needs constants :(
+//  these are the prescribed periodic task execution times in ticks
 #define PERIODIC_PING_ET 50
 #define PERIODIC_PONG_ET 50
 
-#define TEST_SYSTEM
-#define TEST_RR
-//#define TEST_PERIODIC
+//#define TEST_SYSTEM
+//#define TEST_RR
+#define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
 
@@ -60,11 +63,11 @@ void Task_Pong_RR()
  */
 void Task_Ping_Periodic() 
 {
-    int  et = Task_GetArg();
     BIT_SET(PERIODIC_PORT_INIT, 0);
-    BIT_SET(PERIODIC_PORT, 0);
-    _delay_ms(PERIODIC_PING_ET);
-    BIT_RESET(PERIODIC_PORT, 0);
+    for(;;){
+        BIT_TOGGLE(PERIODIC_PORT, 0);
+        Task_Next();
+    }
 }
 
 
@@ -74,9 +77,11 @@ void Task_Ping_Periodic()
 void Task_Pong_Periodic() 
 {
     BIT_SET(PERIODIC_PORT_INIT, 1);
-    BIT_SET(PERIODIC_PORT, 1);
-    _delay_ms(PERIODIC_PONG_ET);
-    BIT_RESET(PERIODIC_PORT, 1);
+    for(;;){
+        do_break = TRUE;
+        BIT_TOGGLE(PERIODIC_PORT, 1);
+        Task_Next();
+    }
 }
 /*
  * System version of "Ping" task.
@@ -89,7 +94,6 @@ void Task_Ping_System()
     BIT_SET(SYSTEM_PORT_INIT, 0);
     if(arg <= 0) {
         for(;;) {
-            //LED on
             BIT_SET(SYSTEM_PORT, 0);
             _delay_ms(400);
 
@@ -101,7 +105,6 @@ void Task_Ping_System()
     }
     else {
         for(i = 0; i<arg; i++){
-            //LED off
             BIT_SET(SYSTEM_PORT, 0);
             _delay_ms(400);
 
@@ -160,7 +163,8 @@ void user_main() {
     int p4 = Task_Create_System(Task_Pong_System, 5);
 #endif
 #ifdef TEST_PERIODIC
-    int p5 = Task_Create_Period(Task_Ping_Periodic, 50, 200, 100, 0); // Period of 2 seconds, WCET of 1 second
+    int p5 = Task_Create_Period(Task_Ping_Periodic, 0, 100, 20, 0); // arg period wcet offset
+    int p6 = Task_Create_Period(Task_Pong_Periodic, 0, 100, 20, 50);
 #endif
 #if defined TEST_SYSTEM && defined TEST_RR && defined TEST_PID_CREATE
     //debug_break(4, p1,p2,p3,p4);

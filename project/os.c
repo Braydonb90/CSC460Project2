@@ -1,8 +1,9 @@
 #include "os.h"
 
 void OS_Abort(unsigned int error) {
+    Disable_Interrupt();
     while(TRUE) {
-        Blink_Pin(OUTPUT_PORT, error);
+        Blink_Pin(ERROR_PIN, error);
         _delay_ms(1000); 
     }
 }

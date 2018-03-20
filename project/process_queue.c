@@ -67,20 +67,6 @@ PD* Q_Pop(ProcessQ* q) {
     return ret;
 }
 
-/*
- * Standard q pop. Only used internally... or not used
- */
-static PD* Q_Pop_Internal(ProcessQ* q) {
-    if (q->length == 0) {
-        return NULL;
-    }
-
-    PD* ret = q->front;
-    q->front = q->front->next;
-    q->length--;
-    return ret;
-}
-
 PD* Q_Peek(ProcessQ* q){
     return q->front;
 }
@@ -93,6 +79,7 @@ void Q_Insert(ProcessQ* q, PD* pd) {
         pd->next = NULL;
         q->front = pd;
         q->back = pd;
+        q->length++;
     }
     else if(pd->next_start < q->front->next_start){
         pd->next = q->front;
@@ -102,20 +89,32 @@ void Q_Insert(ProcessQ* q, PD* pd) {
     else {
         PD* prev = q->front;
 		PD* cur = q->front->next;
+
+        PD* spot = NULL;
 	    	
 		while(cur != NULL) {
+            if(do_break){
+                BIT_SET(SYSTEM_PORT_INIT,0);
+                BIT_SET(SYSTEM_PORT, 0);
+            }
 			if(pd->next_start < cur->next_start) {
-                prev->next = pd;
-				pd->next = cur;
-                q->length++;
-                return;
+                spot =  prev;
+                break;
 			}
             prev = cur;
 			cur = cur->next;
 		}
-        q->back->next = pd;
-        q->back = pd;
-        q->length++;
+        if(spot == NULL){
+            q->back->next = pd;
+            q->back = pd;
+            q->back->next = NULL;
+            q->length++;
+        }
+        else{
+            pd->next = spot;
+            spot->next = pd;
+            q->length++;
+        }
     }
 }
 

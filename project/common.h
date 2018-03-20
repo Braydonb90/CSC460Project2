@@ -4,6 +4,7 @@
 #include <util/delay.h>
 #include <avr/io.h>
 
+
 /****TYPEDEFS*********/
 typedef void (*voidfuncptr) (void);      /* pointer to void f(void) */ 
 typedef unsigned int PID;        // always non-zero if it is valid
@@ -41,12 +42,13 @@ typedef enum error_code {
     INVALID_PRIORITY_CREATE,
     INVALID_PRIORITY_DISPATCH,
     INVALID_STATE_DISPATCH,
-    INVALID_TERMINATE,
+    INVALID_TERMINATE,  //5
     DEBUG_IDLE_HALT,
     NULL_REQUEST,
     NON_NULL_REQUEST,
     QUEUE_ERROR,
-    NO_DEAD_PDS,
+    NO_DEAD_PDS,        //10
+    PERIODIC_OVERUSE,
 	TIMING_VIOLATION
 } ERROR_CODE;    
 /*
@@ -95,13 +97,13 @@ typedef struct kernel_request_param
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
 #define MSECPERTICK   10   // resolution of a system TICK in milliseconds
-#define BLINKDELAY 150
+#define BLINKDELAY 200
 
 //These pins are on port B
 #define OUTPUT_PORT_INIT DDRB
 #define OUTPUT_PORT PORTB
 
-#define ERROR_PIN 7
+#define ERROR_PIN 3
 #define IDLE_PIN 6
 #define CLOCK_PIN 5
 #define DEBUG_PIN 4
@@ -127,5 +129,6 @@ typedef struct kernel_request_param
 #define ANY           0xFF       // a mask for ALL message type
 
 /**********************/
+extern BOOL do_break;
 
 #endif
