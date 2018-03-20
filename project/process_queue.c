@@ -1,6 +1,5 @@
 #include "process_queue.h"
-
-static PD* Q_Pop_Internal(ProcessQ* q);
+#include "output.h"
 
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
     q->front = NULL;
@@ -116,6 +115,17 @@ void Q_Insert(ProcessQ* q, PD* pd) {
             q->length++;
         }
     }
+}
+unsigned int Q_CountScheduledTasks(ProcessQ* q, unsigned int elapsed){
+    int count = 0;
+    PD* p = q->front;
+    while(p != NULL){
+        if(p->next_start < elapsed){
+            count++;
+        }
+        p = p->next;
+    }
+    return count;
 }
 
 

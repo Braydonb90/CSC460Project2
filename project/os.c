@@ -94,15 +94,23 @@ unsigned int Now() {
  */
 void Msg_Send( PID  id, MTYPE t, unsigned int *v )
 {
-    //TODO
+    KERNEL_REQUEST_PARAM prm;
+    prm.pid = id;
+    prm.message_type = t;
+    prm.message = v;
 }
 PID  Msg_Recv( MASK m,           unsigned int *v )
 {
-    //TODO
+    KERNEL_REQUEST_PARAM prm;
+    prm.mask = m;
+    prm.message = v;
 }
 void Msg_Rply( PID  id,          unsigned int r )
 {
     //TODO
+    KERNEL_REQUEST_PARAM prm;
+    prm.pid = id;
+    prm.reply = r;
 }
 
 /*

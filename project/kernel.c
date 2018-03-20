@@ -207,6 +207,8 @@ static void Kernel_Create_Task()
 				Process[x].period = current_request->period;
 				Process[x].next_start = Elapsed + current_request->offset;
 				Process[x].state = READY;
+                if(periodic_q.length == 2)
+                    do_break = TRUE;
                 Q_Insert(&periodic_q, Process + x);
                 break;
             case RR:
@@ -230,35 +232,37 @@ static void Dispatch()
 {
     //put current process back in queue, if relevant
     //if the request was terminate, Cp should already be dead    
-    switch(Cp->priority) {
-        case SYSTEM:
-            //only push system task if it isn't dead
-            if(Cp->state != DEAD) {
-                Cp->state = READY;
-                Q_Push(&system_q, (PD*)Cp);
-            }
-            else if (Cp->state == DEAD){
+    if(Cp != NULL){
+        switch(Cp->priority) {
+            case SYSTEM:
+                //only push system task if it isn't dead
+                if(Cp->state != DEAD) {
+                    Cp->state = READY;
+                    Q_Push(&system_q, (PD*)Cp);
+                }
+                else if (Cp->state == DEAD){
+                    break;
+                }
+                else{
+                    OS_Abort(INVALID_STATE_DISPATCH);
+                }
                 break;
-            }
-            else{
-                OS_Abort(INVALID_STATE_DISPATCH);
-            }
-            break;
-        case PERIODIC:
-            Q_Insert(&periodic_q, (PD*)Cp);
-            break;
-        case RR:
-		// RR Task needs to be at beginning of queue if preempted
-            if(Cp->state != DEAD){
-                Cp->state = READY;
-                Q_Push(&rr_q, (PD*)Cp);
-            }
-            break;
-        case -1:
-            break;
-        default:
-            OS_Abort(INVALID_PRIORITY_DISPATCH);
-            break;
+            case PERIODIC:
+                Q_Insert(&periodic_q, (PD*)Cp);
+                break;
+            case RR:
+            // RR Task needs to be at beginning of queue if preempted
+                if(Cp->state != DEAD){
+                    Cp->state = READY;
+                    Q_Push(&rr_q, (PD*)Cp);
+                }
+                break;
+            case -1:
+                break;
+            default:
+                OS_Abort(INVALID_PRIORITY_DISPATCH);
+                break;
+        }
     }
     idling = FALSE;
     Cp = NULL;
@@ -273,8 +277,11 @@ static void Dispatch()
         }
     }
     else if(periodic_q.length > 0) {
-        PD* check = Q_Peek(&periodic_q);
-        if(check != NULL && check->next_start <= Elapsed){
+        int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
+        if(r_count > 1){
+            OS_Abort(TIMING_VIOLATION);
+        }
+        else if(r_count == 1){
             Cp = Q_Pop(&periodic_q);
             Cp->state = RUNNING;
         }
@@ -343,7 +350,7 @@ static void Kernel_Next_Request()
                     Dispatch();
                 }
                 else if(Cp->priority == PERIODIC){
-                    OS_Abort(PERIODIC_OVERUSE);
+
                 }
                 break;
             default:
@@ -364,6 +371,16 @@ PID Kernel_GetPid() {
 
 TICK Kernel_GetElapsed() {
 	return Elapsed;
+}
+
+static void Kernel_Request_Msg_Send(){
+        
+}
+static void Kernel_Request_Msg_Recv(){
+
+}
+static void Kernel_Request_Msg_Reply(){
+
 }
 
 /*

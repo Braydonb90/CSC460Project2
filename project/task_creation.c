@@ -11,8 +11,8 @@
 #define PERIODIC_PING_ET 50
 #define PERIODIC_PONG_ET 50
 
-//#define TEST_SYSTEM
-//#define TEST_RR
+#define TEST_SYSTEM
+#define TEST_RR
 #define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
@@ -114,6 +114,10 @@ void Task_Ping_System()
             Task_Next();
         }
     }
+#ifdef TEST_PERIODIC
+    Task_Create_Period(Task_Ping_Periodic, 0, 400, 20, 0); // arg period wcet offset
+    Task_Create_Period(Task_Pong_Periodic, 0, 400, 20, 50);
+#endif
 }
 
 
@@ -158,13 +162,17 @@ void user_main() {
     int p1 = Task_Create_RR(Task_Ping_RR, 0);
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 
 #endif
+int start_p5 = 0;
+int start_p6 = 50;
 #ifdef TEST_SYSTEM
-    int p3 = Task_Create_System(Task_Ping_System, 8);
-    int p4 = Task_Create_System(Task_Pong_System, 5);
-#endif
-#ifdef TEST_PERIODIC
-    int p5 = Task_Create_Period(Task_Ping_Periodic, 0, 100, 20, 0); // arg period wcet offset
-    int p6 = Task_Create_Period(Task_Pong_Periodic, 0, 100, 20, 50);
+    int arg_p3 = 8;
+    int arg_p4 = 5;
+    int ex_time = arg_p3*800/MSECPERTICK + arg_p4*400/MSECPERTICK;
+    int p3 = Task_Create_System(Task_Ping_System, arg_p3);
+    int p4 = Task_Create_System(Task_Pong_System, arg_p4);
+#elif defined TEST_PERIODIC 
+    int p5 = Task_Create_Period(Task_Ping_Periodic, 0, 400, 20, start_p5); // arg period wcet offset
+    int p6 = Task_Create_Period(Task_Pong_Periodic, 0, 400, 20, start_p6);
 #endif
 #if defined TEST_SYSTEM && defined TEST_RR && defined TEST_PID_CREATE
     //debug_break(4, p1,p2,p3,p4);

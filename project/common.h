@@ -30,8 +30,9 @@ typedef enum process_state
     DEAD = 0, 
     READY, 
     RUNNING,
-	WAITING,
-	BLOCKED
+	SENDBLOCK,
+    RECVBLOCK,
+    RPLYBLOCK
 } PROCESS_STATE;
 
 /*
@@ -75,6 +76,10 @@ typedef struct kernel_request_param
     TICK period;
     TICK offset;
     PRIORITY priority;
+    MTYPE message_type;
+    MASK mask;
+    unsigned int *message;
+    unsigned int reply;
     int arg;    
 } KERNEL_REQUEST_PARAM;
 
