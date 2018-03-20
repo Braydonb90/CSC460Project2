@@ -283,6 +283,7 @@ static void Dispatch()
         }
         else if(r_count == 1){
             Cp = Q_Pop(&periodic_q);
+            Cp->next_start = Elapsed;
             Cp->state = RUNNING;
         }
     }
@@ -328,8 +329,6 @@ static void Kernel_Next_Request()
                 Kernel_Create_Task();
                 break;
             case NEXT:
-            case NONE:
-                /* NONE could be caused by a timer interrupt --- this is no longer true */
                 if(Cp->priority == PERIODIC) {
                     Cp->next_start = Cp->next_start + Cp->period;
                     Cp->state = READY;

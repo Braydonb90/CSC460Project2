@@ -11,7 +11,7 @@
 #define PERIODIC_PING_ET 50
 #define PERIODIC_PONG_ET 50
 
-#define TEST_SYSTEM
+//#define TEST_SYSTEM
 #define TEST_RR
 #define TEST_PERIODIC
 //#define TEST_PID_CREATE
@@ -163,7 +163,7 @@ void user_main() {
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 
 #endif
 int start_p5 = 0;
-int start_p6 = 50;
+int start_p6 = 20;
 #ifdef TEST_SYSTEM
     int arg_p3 = 8;
     int arg_p4 = 5;
