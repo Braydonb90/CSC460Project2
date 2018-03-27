@@ -35,6 +35,13 @@ PD* Q_Pop_Ready(ProcessQ* q) {
     PD* cur = prev->next;
     //in case the front is actually ready
     if(prev->state == READY){
+        //cur should be null here???
+        if(q->front == q->back){
+            if(cur != NULL){
+                OS_Abort(NON_NULL_Q_BACK);
+            }
+            q->back = cur;
+        }
         q->front = cur;
         q->length--;
         return prev;
@@ -42,6 +49,9 @@ PD* Q_Pop_Ready(ProcessQ* q) {
     //otherwise
     while(cur != NULL){
         if(cur->state == READY){
+            if(cur == q->back){
+                q->back = prev;
+            }
             prev->next = cur->next;
             cur->next = NULL;
             q->length--;
