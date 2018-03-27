@@ -257,7 +257,7 @@ static void Dispatch()
                     Q_Push(&rr_q, (PD*)Cp);
                 }
                 break;
-            case -1:
+            case IDLE:
                 break;
             default:
                 OS_Abort(INVALID_PRIORITY_DISPATCH);
@@ -278,6 +278,7 @@ static void Dispatch()
     }
     else if(periodic_q.length > 0) {
         int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
+
         if(r_count > 1){
             OS_Abort(TIMING_VIOLATION);
         }
@@ -324,6 +325,8 @@ static void Kernel_Next_Request()
         if(current_request == NULL) {
             OS_Abort(NULL_REQUEST);
         }
+        if(do_break)
+            debug_break(3,1,2,1);
         switch(current_request->request_type){
             case CREATE:
                 Kernel_Create_Task();
@@ -349,7 +352,9 @@ static void Kernel_Next_Request()
                     Dispatch();
                 }
                 else if(Cp->priority == PERIODIC){
-
+                    if(Cp->next_start + Cp->wcet <= Elapsed){
+                        OS_Abort(PERIODIC_OVERUSE);
+                    }
                 }
                 break;
             default:
@@ -454,9 +459,7 @@ ISR(TIMER4_COMPA_vect)
         KERNEL_REQUEST_PARAM prm;
         prm.request_type = TIMER_TICK; 
 
-        current_request = &prm;
-
-        Enter_Kernel();
+        Kernel_Request(&prm);
     }
         
 }
@@ -499,7 +502,7 @@ void Kernel_Init()
     //Shouldn't need to do any initialization? 
     memset(&idle_process, 0, sizeof(PD));
     Kernel_Create_Task_At(&idle_process, Kernel_Idle_Task);
-    idle_process.priority = -1;
+    idle_process.priority = IDLE;
 
     //Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXTHREAD; x++) {
@@ -536,10 +539,6 @@ void Kernel_Idle_Task() {
     for (;;) {
         idling = TRUE;
         BIT_TOGGLE(OUTPUT_PORT, IDLE_PIN);
-        //TODO decide if this should be here, or if tick ISR should check for outstanding requests
-        if(current_request != NULL) {
-            OS_Abort(DEBUG_IDLE_HALT);
-        }
         _delay_ms(200);
     }
 }

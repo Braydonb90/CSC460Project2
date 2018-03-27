@@ -12,7 +12,7 @@
 #define PERIODIC_PONG_ET 50
 
 //#define TEST_SYSTEM
-#define TEST_RR
+//#define TEST_RR
 #define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
@@ -61,28 +61,23 @@ void Task_Pong_RR()
 /*
  * A cooperative "Ping" task.
  */
-void Task_Ping_Periodic() 
+void Task_Ping_Periodic() PERIODIC_TASK( 
 {
     BIT_SET(PERIODIC_PORT_INIT, 0);
-    for(;;){
-        BIT_TOGGLE(PERIODIC_PORT, 0);
-        Task_Next();
-    }
+    BIT_TOGGLE(PERIODIC_PORT, 0);
 }
+)
 
 
 /*
  * A cooperative "Pong" task.
  */
-void Task_Pong_Periodic() 
+void Task_Pong_Periodic() PERIODIC_TASK(
 {
     BIT_SET(PERIODIC_PORT_INIT, 1);
-    for(;;){
-        do_break = TRUE;
-        BIT_TOGGLE(PERIODIC_PORT, 1);
-        Task_Next();
-    }
+    BIT_TOGGLE(PERIODIC_PORT, 1);
 }
+)
 /*
  * System version of "Ping" task.
  * Yields every iteration, terminates after arg iteration
@@ -163,7 +158,7 @@ void user_main() {
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 
 #endif
 int start_p5 = 0;
-int start_p6 = 20;
+int start_p6 = 1;
 #ifdef TEST_SYSTEM
     int arg_p3 = 8;
     int arg_p4 = 5;

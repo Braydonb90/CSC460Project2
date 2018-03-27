@@ -19,7 +19,8 @@ typedef unsigned char MASK;
 typedef enum priority {
     SYSTEM = 0,
     PERIODIC,
-    RR
+    RR,
+    IDLE
 } PRIORITY;
 
 /*
@@ -40,17 +41,17 @@ typedef enum process_state
  */
 typedef enum error_code {
     INVALID_REQUEST = 1,
-    INVALID_PRIORITY_CREATE,
-    INVALID_PRIORITY_DISPATCH,
-    INVALID_STATE_DISPATCH,
-    INVALID_TERMINATE,  //5
-    DEBUG_IDLE_HALT,
-    NULL_REQUEST,
-    NON_NULL_REQUEST,
-    QUEUE_ERROR,
-    NO_DEAD_PDS,        //10
-    PERIODIC_OVERUSE,
-	TIMING_VIOLATION
+    INVALID_PRIORITY_CREATE = 2,
+    INVALID_PRIORITY_DISPATCH = 3,
+    INVALID_STATE_DISPATCH = 4,
+    INVALID_TERMINATE = 5,  
+    NULL_REQUEST = 6,
+    NON_NULL_REQUEST = 7,
+    QUEUE_ERROR = 8,
+    NO_DEAD_PDS = 9,        
+    PERIODIC_OVERUSE = 10,
+	TIMING_VIOLATION = 11,
+    NON_NULL_Q_BACK = 12
 } ERROR_CODE;    
 /*
  * This is the set of kernel requests, i.e., a request code for each system call.
@@ -87,6 +88,15 @@ typedef struct kernel_request_param
 
 /****MACROS***********/
 
+// I stole this. Much nicer than requiring periodic tasks to explicitly loop
+#define PERIODIC_TASK(body)         \
+    {                               \
+        for(;; Task_Next()){        \
+            body                    \
+        }                           \
+    }                               \
+
+
 #define BIT_RESET(PORT, PIN) (PORT &= ~(1<<PIN))
 #define BIT_SET(PORT, PIN)   (PORT |= (1<<PIN))
 #define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
@@ -113,15 +123,15 @@ typedef struct kernel_request_param
 #define CLOCK_PIN 5
 #define DEBUG_PIN 4
 
-//System Tasks on Port A 22(0)-29(7)
+//System Tasks on Port A ==> (Pin22 == PA0) to (Pin29 == PA7)
 #define SYSTEM_PORT_INIT DDRA
 #define SYSTEM_PORT PORTA
 
-//Periodic Tasks on Port C 37(0)-30(7)
+//Periodic Tasks on Port C ==> (Pin37 == PC0) to (Pin30 == PC7)
 #define PERIODIC_PORT_INIT DDRC
 #define PERIODIC_PORT PORTC
 
-//Round Robin Tasks on Port L 49(0)-42(7)
+//Round Robin Tasks on Port L ==> (Pin49 == PL0) to (Pin42 == PL7)
 #define RR_PORT_INIT DDRL
 #define RR_PORT PORTL
 
