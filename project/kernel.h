@@ -13,6 +13,10 @@ TICK Kernel_GetElapsed();
  */
 extern void user_main();
 
+char* Get_State(short);
+
+int Kernel_GetArg();
+PID Kernel_GetPid();
 
 /*===========
   * RTOS Internal

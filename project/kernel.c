@@ -46,6 +46,9 @@ static void Kernel_Next_Request();
  * Task has requested to be terminated. Need to clear mem and set to DEAD
  */
 static void Kernel_Request_Terminate();
+static void Kernel_Request_Msg_Send();
+static void Kernel_Request_Msg_Recv();
+static void Kernel_Request_Msg_Reply();
 
 /*
  * This function initializes the kernel and must be called before any other
@@ -132,6 +135,31 @@ static ProcessQ rr_q;
 BOOL idling;
 BOOL do_break = FALSE;
 
+char* Get_State(short s) {
+	switch(s) {
+		case DEAD:				return "DEAD";
+		case READY:				return "READY";
+		case RUNNING:			return "RUNNING";
+		case BLOCKED_SEND:		return "BLOCKED_SEND";
+		case BLOCKED_RECEIVE:	return "BLOCKED_RECEIVE";
+		case BLOCKED_REPLY:		return "BLOCKED_REPLY";
+		default:				return ""+s;
+	}
+}
+
+char* Get_Request_Type(short s) {
+	switch(s) {
+		case NONE:		return "NONE";
+		case CREATE:	return "CREATE";
+		case NEXT:		return "NEXT";
+		case TIMER_TICK:return "TIMER_TICK";
+		case TERMINATE:	return "TERMINATE";
+		case SEND:		return "SEND";
+		case RECEIVE:	return "RECEIVE";
+		case REPLY:		return "REPLY";
+		default:		return ""+s;
+	}
+}
 
 /****Start of Implementation****/
 
@@ -230,30 +258,35 @@ static void Kernel_Create_Task()
  */
 static void Dispatch()
 {
-    //put current process back in queue, if relevant
-    //if the request was terminate, Cp should already be dead    
+
     if(Cp != NULL){
+		//put current process back in queue, if relevant
+		//if the request was terminate, Cp should already be dead    
         switch(Cp->priority) {
             case SYSTEM:
+				if(Cp->state == RUNNING) {
+					Cp->state = READY;
+				}
                 //only push system task if it isn't dead
                 if(Cp->state != DEAD) {
-                    Cp->state = READY;
                     Q_Push(&system_q, (PD*)Cp);
                 }
-                else if (Cp->state == DEAD){
+                /*else if (Cp->state == DEAD){
                     break;
                 }
                 else{
                     OS_Abort(INVALID_STATE_DISPATCH);
-                }
+                }*/
                 break;
             case PERIODIC:
                 Q_Insert(&periodic_q, (PD*)Cp);
                 break;
             case RR:
             // RR Task needs to be at beginning of queue if preempted
-                if(Cp->state != DEAD){
+				if(Cp->state == RUNNING) {
                     Cp->state = READY;
+				}
+                if(Cp->state != DEAD){
                     Q_Push(&rr_q, (PD*)Cp);
                 }
                 break;
@@ -272,9 +305,6 @@ static void Dispatch()
         if(Cp == NULL) {
             OS_Abort(QUEUE_ERROR);
         }
-        else {
-            Cp->state = RUNNING;
-        }
     }
     else if(periodic_q.length > 0) {
         int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
@@ -285,20 +315,17 @@ static void Dispatch()
         else if(r_count == 1){
             Cp = Q_Pop(&periodic_q);
             Cp->next_start = Elapsed;
-            Cp->state = RUNNING;
         }
-    }
-
-    //do RR
-    if(Cp == NULL && rr_q.length > 0) {
+    } else if(rr_q.length > 0) {
         Cp = Q_Pop_Ready(&rr_q);
-        Cp->state = RUNNING;
     }
     
     if(Cp == NULL) {
         idling = TRUE;
         Cp = &idle_process;
-    }
+    } else {
+        Cp->state = RUNNING;
+	}
     if(!idling) {
         BIT_RESET(OUTPUT_PORT, IDLE_PIN);
     }
@@ -357,6 +384,30 @@ static void Kernel_Next_Request()
                     }
                 }
                 break;
+		case SEND:
+				printf("SEND\n");
+				if(Cp->priority == PERIODIC) {
+					OS_Abort(INVALID_MSG_SEND_REQUEST);
+				}
+				Kernel_Request_Msg_Send();
+				Dispatch();
+				break;
+			case RECEIVE:
+				printf("Receive Mask: %d\n", current_request->msg_detail.mask);
+				if(Cp->priority == PERIODIC) {
+					OS_Abort(INVALID_MSG_RECEIVE_REQUEST);
+				}
+				Kernel_Request_Msg_Recv();
+				Dispatch();
+				break;
+			case REPLY:
+				printf("Reply\n");
+				if(Cp->priority == PERIODIC) {
+					OS_Abort(INVALID_MSG_REPLY_REQUEST);
+				}
+				Kernel_Request_Msg_Reply();
+				Dispatch();
+				break;
             default:
                 /* Houston! we have a problem here! */
                 OS_Abort(INVALID_REQUEST);
@@ -378,13 +429,58 @@ TICK Kernel_GetElapsed() {
 }
 
 static void Kernel_Request_Msg_Send(){
-        
+        if(current_request->msg_detail.pid < MAXTHREAD && Process[current_request->msg_detail.pid].state != DEAD) {
+					Cp->msg_detail.pid = current_request->msg_detail.pid;
+					Cp->msg_detail.msg = current_request->msg_detail.msg;
+					Cp->msg_detail.type = current_request->msg_detail.type;
+					Cp->state = BLOCKED_SEND;
+					int x;
+					for(x = 0; x < MAXTHREAD; x++) { // Check to see if any messages are blocked by receive
+					
+						if(Process[x].state == BLOCKED_RECEIVE) {
+							printf("Found: %d\n", Process[x].pid);
+							printf("Message: %d\n", Cp->msg_detail.pid);
+							printf("Mask: %d\n", (Process[x].msg_detail.mask));
+							printf("Type: %d\n",  Cp->msg_detail.type);
+							
+							if(Process[x].pid == Cp->msg_detail.pid && (Process[x].msg_detail.mask & Cp->msg_detail.type))
+							{
+								current_request->msg_detail.pid = Process[x].msg_detail.pid = Cp->pid;
+								*(Cp->msg_detail.msg) = *(Process[x].msg_detail.msg);
+								Cp->state = BLOCKED_REPLY;
+								Process[x].state = READY;
+								break;
+							}
+						}
+					}
+				} else {
+					// NO MATCHING PID OR OUT OF RANGE
+				}
 }
 static void Kernel_Request_Msg_Recv(){
-
+current_request->msg_detail.pid = 0;
+				Cp->state = BLOCKED_RECEIVE;
+				
+				Cp->msg_detail.mask = current_request->msg_detail.mask;
+				int x;
+				for(x = 0; x < MAXTHREAD; x++) { // Check to see if any messages are blocked by send for the current process
+					if(Process[x].state == BLOCKED_SEND && Process[x].msg_detail.pid == Cp->pid && (Process[x].msg_detail.type & Cp->msg_detail.mask)) {
+				BIT_SET(SYSTEM_PORT, 1);
+						current_request->msg_detail.pid = Cp->msg_detail.pid = Process[x].pid;
+						
+						*(Cp->msg_detail.msg) = *(Process[x].msg_detail.msg);
+						Process[x].state = BLOCKED_REPLY;
+						Cp->state = READY;
+						break;
+					}
+				}
 }
 static void Kernel_Request_Msg_Reply(){
-
+if(Process[Cp->msg_detail.pid].state == BLOCKED_REPLY) {
+					
+					*(Process[Cp->msg_detail.pid].msg_detail.msg) = current_request->msg_detail.r;
+					Process[Cp->msg_detail.pid].state = READY;
+				}
 }
 
 /*
@@ -546,6 +642,13 @@ void Kernel_Idle_Task() {
 
 void main() 
 {
+
+	uart_init();
+    stdout = &uart_output;
+    stdin  = &uart_input;
+	
+	printf("Test\n");
+	
     Kernel_Init();
     Setup_System_Clock();
     Kernel_Start();

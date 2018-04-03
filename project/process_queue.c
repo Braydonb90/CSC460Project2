@@ -1,6 +1,9 @@
 #include "process_queue.h"
 #include "output.h"
 
+
+static void print_queue(ProcessQ* q);
+
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
     q->front = NULL;
     q->back = NULL;
@@ -14,22 +17,55 @@ ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
  * for RR and system tasks
  */
 void Q_Push(ProcessQ* q, PD* pd) {
+    
+	pd->next = NULL;
     if (q->length == 0) {
-        pd->next = NULL;
         q->front = pd;
-        q->back = pd;
-        q->length++;
     }
     else {
         q->back->next = pd;
-        q->back = pd;
-        q->length++;
     }
+    q->back = pd;
+    q->length++;
 }
+
+PD* Q_Pop_Ready(ProcessQ* q) {
+	printf("Pop Ready\n");
+	print_queue(q);
+	
+	PD* prev = NULL;
+    PD* cur = q->front;
+	
+	while(cur != NULL) {
+		if(cur->state == READY) {
+			q->length--;
+			
+			if(q->front->pid == cur->pid) {
+				q->front = cur->next;
+			}
+			if(q->back->pid == cur->pid) {
+				q->back = prev;
+			}
+			if(prev != NULL) {
+				prev->next = cur->next;
+			}
+			break;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+	if(cur != NULL) {
+		printf("Pop %d\n", cur->pid);
+	} else {
+		printf("Pop nothing\n");
+	}
+	return cur;
+}
+
 /*
  * Cycles through Q, returning the first READY task
  */
-PD* Q_Pop_Ready(ProcessQ* q) {
+PD* Q_Pop_Ready_OLD(ProcessQ* q) {
     int len = q->length,i;
     PD* prev = q->front;
     PD* cur = prev->next;
@@ -63,13 +99,29 @@ PD* Q_Pop_Ready(ProcessQ* q) {
             
     return NULL;
 }
+
+void print_queue(ProcessQ* q) {
+	printf("print_queue\n"); 
+	int i = 0;
+	PD* cur = q->front;
+	while(cur != NULL){
+		printf("Queue index %d\n", i);  
+		printf("Cur: %d ; state: %s\n", cur->pid, Get_State(cur->state));
+		i++;
+        cur = cur->next;
+		if(cur != NULL){
+			printf("Next: %d\n", cur->pid);
+		}
+    }  
+	printf("Queue size %d\n", i);  
+	printf("Queue length %d\n", q->length);  
+}
 /*
  * Regular pop
  */
 PD* Q_Pop(ProcessQ* q) {
     if(q->front == NULL)
         return NULL;
-
     PD* ret = q->front;
     q->front = q->front->next;
     q->length--;

@@ -11,9 +11,9 @@
 #define PERIODIC_PING_ET 50
 #define PERIODIC_PONG_ET 50
 
-//#define TEST_SYSTEM
-//#define TEST_RR
-#define TEST_PERIODIC
+#define TEST_SYSTEM
+#define TEST_RR
+//#define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
 

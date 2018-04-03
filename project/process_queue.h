@@ -19,6 +19,7 @@ typedef struct ProcessDescriptor
     PID pid;
     KERNEL_REQUEST_PARAM request_param; //Any reason to store this here?
     struct ProcessDescriptor* next;
+	MESSAGE msg_detail;
 	
 	// Only used for periodic tasks
 	TICK remaining; //remaining allowed execution time

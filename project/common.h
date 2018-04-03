@@ -1,6 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include "uart.h"
+#include <stdio.h>
 #include <util/delay.h>
 #include <avr/io.h>
 
@@ -31,9 +33,9 @@ typedef enum process_state
     DEAD = 0, 
     READY, 
     RUNNING,
-	SENDBLOCK,
-    RECVBLOCK,
-    RPLYBLOCK
+	BLOCKED_SEND,
+	BLOCKED_RECEIVE,
+	BLOCKED_REPLY
 } PROCESS_STATE;
 
 /*
@@ -51,8 +53,27 @@ typedef enum error_code {
     NO_DEAD_PDS = 9,        
     PERIODIC_OVERUSE = 10,
 	TIMING_VIOLATION = 11,
-    NON_NULL_Q_BACK = 12
+    NON_NULL_Q_BACK = 12,
+	INVALID_MSG_SEND_REQUEST = 13,
+	INVALID_MSG_RECEIVE_REQUEST = 14,
+	INVALID_MSG_REPLY_REQUEST = 15,
+    DEBUG_IDLE_HALT = 16
 } ERROR_CODE;    
+typedef enum message_type
+{
+	MSG_TEST = 1,
+	MSG_SYSTEM
+} MESSAGE_TYPE;
+
+typedef struct message
+{
+	PID pid;
+	unsigned int *msg;
+	unsigned int r;
+	MTYPE type;
+	MASK mask;
+} MESSAGE;
+
 /*
  * This is the set of kernel requests, i.e., a request code for each system call.
  */
@@ -62,7 +83,10 @@ typedef enum kernel_request_type
     CREATE,
     NEXT,
     TIMER_TICK,
-    TERMINATE
+    TERMINATE,
+	SEND,
+	RECEIVE,
+	REPLY
 } KERNEL_REQUEST_TYPE;
 
 /* 
@@ -77,11 +101,8 @@ typedef struct kernel_request_param
     TICK period;
     TICK offset;
     PRIORITY priority;
-    MTYPE message_type;
-    MASK mask;
-    unsigned int *message;
-    unsigned int reply;
     int arg;    
+	MESSAGE msg_detail;
 } KERNEL_REQUEST_PARAM;
 
 /*********************/
@@ -118,7 +139,7 @@ typedef struct kernel_request_param
 #define OUTPUT_PORT_INIT DDRB
 #define OUTPUT_PORT PORTB
 
-#define ERROR_PIN 3
+#define ERROR_PIN 7
 #define IDLE_PIN 6
 #define CLOCK_PIN 5
 #define DEBUG_PIN 4
