@@ -313,6 +313,8 @@ static void Dispatch()
         int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
 
         if(r_count > 1){
+            printf("Timing violation at tick %d\n", Elapsed); 
+            print_queue(&periodic_q);
             OS_Abort(TIMING_VIOLATION);
         }
         else if(r_count == 1){

@@ -11,7 +11,7 @@
 #define PERIODIC_PING_ET 50
 #define PERIODIC_PONG_ET 50
 
-#define TEST_SYSTEM
+//#define TEST_SYSTEM
 #define TEST_RR
 #define TEST_PERIODIC
 //#define TEST_PID_CREATE
@@ -158,7 +158,7 @@ void user_main() {
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 
 #endif
 int start_p5 = 0;
-int start_p6 = 1;
+int start_p6 = 3;
 #ifdef TEST_SYSTEM
     int arg_p3 = 8;
     int arg_p4 = 5;
@@ -166,8 +166,8 @@ int start_p6 = 1;
     int p3 = Task_Create_System(Task_Ping_System, arg_p3);
     int p4 = Task_Create_System(Task_Pong_System, arg_p4);
 #elif defined TEST_PERIODIC 
-    int p5 = Task_Create_Period(Task_Ping_Periodic, 0, 400, 20, start_p5); // arg period wcet offset
-    int p6 = Task_Create_Period(Task_Pong_Periodic, 0, 400, 20, start_p6);
+    int p5 = Task_Create_Period(Task_Ping_Periodic, 0, 50, 3, start_p5); // arg period wcet offset
+    int p6 = Task_Create_Period(Task_Pong_Periodic, 0, 50, 3, start_p6);
 #endif
 #if defined TEST_SYSTEM && defined TEST_RR && defined TEST_PID_CREATE
     //debug_break(4, p1,p2,p3,p4);
