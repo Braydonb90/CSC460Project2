@@ -701,8 +701,6 @@ void main()
     stdout = &uart_output;
     stdin  = &uart_input;
     
-    for(;;) {
-        
 	
     Kernel_Init();
     Setup_System_Clock();
