@@ -1,5 +1,4 @@
 setpath
-*.conf
 *.o
 *.hex
 *.elf
