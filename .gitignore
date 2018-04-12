@@ -1,5 +1,4 @@
 setpath
-build
 *.conf
 *.o
 *.hex
