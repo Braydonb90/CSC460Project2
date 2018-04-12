@@ -1,0 +1,5 @@
+source setpath
+make clean
+sudo fuser -k /dev/ttyACM0
+sudo "PATH=$PATH" make flash
+sudo screen /dev/ttyACM0
