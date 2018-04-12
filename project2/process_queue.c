@@ -2,7 +2,6 @@
 #include "output.h"
 
 
-static void print_queue(ProcessQ* q);
 
 ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
     q->front = NULL;
@@ -19,7 +18,7 @@ ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
 void Q_Push(ProcessQ* q, PD* pd) {
     if(DEBUG) puts("|\n|\n");
     if(DEBUG) printf("Q Push\n");
-    print_queue(q); 
+    if(DEBUG) print_queue(q); 
 	pd->next = NULL;
     if (q->length == 0) {
         q->front = pd;
@@ -36,7 +35,7 @@ void Q_Push(ProcessQ* q, PD* pd) {
 PD* Q_Pop_Ready(ProcessQ* q) {
     if(DEBUG) puts("|\n|\n");
 	if(DEBUG) printf("Q Pop Ready\n");
-	print_queue(q);
+	if(DEBUG) print_queue(q);
 	
 	PD* prev = NULL;
     PD* cur = q->front;
@@ -110,19 +109,22 @@ void print_queue(ProcessQ* q) {
 	int i = 0;
 	PD* cur = q->front;
 	while(cur != NULL){
-		if(DEBUG) printf("----- Index %d -----\n", i);  
-		if(DEBUG) printf("PID: %d | state: %d | priority: %d", cur->pid, cur->state, cur->priority);
+		printf("----- Index %d -----\n", i);  
+		printf("PID: %d | state: %d | priority: %d", cur->pid, cur->state, cur->priority);
+        if(q->queue_type == PERIODIC){
+            printf(" | next_start: %d", cur->next_start);
+        }
 		i++;
         cur = cur->next;
 		if(cur != NULL){
-			if(DEBUG) printf(" | next: %d\n", cur->pid);
+			printf(" | next: %d\n", cur->pid);
 		}
         else {
-            if(DEBUG) puts(" | next: NULL\n");
+            puts(" | next: NULL\n");
         }
     }  
-	if(DEBUG) printf("Queue size %d\n", i);  
-	if(DEBUG) printf("Queue length %d\n", q->length);  
+	printf("Queue size %d\n", i);  
+	printf("Queue length %d\n", q->length);  
 }
 /*
  * Regular pop
@@ -146,7 +148,7 @@ PD* Q_Peek(ProcessQ* q){
 void Q_Insert(ProcessQ* q, PD* pd) {
     if(DEBUG) puts("|\n|\n");
     if(DEBUG) printf("Q Insert\n");
-    print_queue(q);
+    if(DEBUG) print_queue(q);
     if (q->length == 0) {
         pd->next = NULL;
         q->front = pd;

@@ -311,13 +311,19 @@ static void Dispatch()
     }
     if(Cp == NULL && periodic_q.length > 0) {
         int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
+        if(r_count > 0) {
+            printf("%d periodic tasks ready\n", r_count);
+            print_queue(&periodic_q);
+        }
 
         if(r_count > 1){
+            printf("Timing violation at tick %d\n", Elapsed); 
+            print_queue(&periodic_q);
             OS_Abort(TIMING_VIOLATION);
         }
         else if(r_count == 1){
             Cp = Q_Pop(&periodic_q);
-            Cp->next_start = Elapsed;
+            //Cp->next_start = Elapsed;
         }
     }
     if(Cp == NULL && rr_q.length > 0) {
@@ -548,7 +554,7 @@ static void Setup_System_Clock()
     unsigned int per_tick = 62500 * ((MSECPERTICK>1000)? 1000 : MSECPERTICK) / 1000;
 
     if(DEBUG) printf("ms per system tick: %u\nclock ticks per system tick: %u\n", MSECPERTICK, per_tick); 
-    _delay_ms(2000);
+    if(DEBUG) _delay_ms(2000);
     OCR4A = per_tick;
 
     //Enable interupt A for timer 4.

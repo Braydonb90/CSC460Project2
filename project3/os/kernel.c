@@ -317,7 +317,6 @@ static void Dispatch()
         }
         else if(r_count == 1){
             Cp = Q_Pop(&periodic_q);
-            Cp->next_start = Elapsed;
         }
     }
     if(Cp == NULL && rr_q.length > 0) {
