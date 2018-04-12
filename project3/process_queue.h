@@ -44,6 +44,7 @@ PD* Q_Pop_Ready(ProcessQ* q);
 PD* Q_Pop(ProcessQ* q);
 PD* Q_Peek(ProcessQ* q);
 void Q_Insert(ProcessQ* q, PD* pd);
+void print_queue(ProcessQ* q);
 unsigned int Q_CountScheduledTasks(ProcessQ* q, unsigned int elapsed);
 
 
