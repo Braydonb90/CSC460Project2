@@ -3,17 +3,18 @@
  *************************/
 
 #include <util/delay.h>
-#include "common.h"
-#include "os.h"
+#include "../os/common.h"
+#include "../os/os.h"
+#include "roomba.h"
 
 //delay function needs constants :(
 //  these are the prescribed periodic task execution times in ticks
 #define PERIODIC_PING_ET 50
 #define PERIODIC_PONG_ET 50
 
-#define TEST_SYSTEM
-#define TEST_RR
-#define TEST_PERIODIC
+//#define TEST_SYSTEM
+//#define TEST_RR
+//#define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
 
@@ -27,7 +28,6 @@
  */
 void Task_Ping_RR() 
 {
-    int  x ;
     BIT_SET(RR_PORT_INIT, 0);
     for(;;){
         //LED off
@@ -45,7 +45,6 @@ void Task_Ping_RR()
  */
 void Task_Pong_RR() 
 {
-    int  x;
     BIT_SET(RR_PORT_INIT, 1);
     for(;;) {
         //LED on
@@ -153,6 +152,7 @@ void Task_Pong_System()
 
 
 void user_main() {
+	Task_Create_System(Roomba_Init, 0);
 #ifdef TEST_RR
     int p1 = Task_Create_RR(Task_Ping_RR, 0);
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 

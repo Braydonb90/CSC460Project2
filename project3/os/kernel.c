@@ -430,7 +430,7 @@ static void Kernel_Next_Request()
         }
         current_request = NULL;
 
-        if(DEBUG) printf("exiting kernel\ncurrent_request=%d\n", current_request);
+        if(DEBUG) printf("exiting kernel\n");
     } 
 }
 
@@ -576,7 +576,7 @@ ISR(TIMER4_COMPA_vect)
         // but if there is????
         // Shouldn't be possible, as any request should immediately disable interrupts
         if(current_request != NULL) {
-            if(DEBUG) printf("current_request=%d\n",current_request);
+            if(DEBUG) printf("current_request not null\n");
             OS_Abort(NON_NULL_REQUEST);
         }
         prm.request_type = TIMER_TICK; 
@@ -669,8 +669,7 @@ void Kernel_Idle_Task() {
 
 void main() 
 {
-
-	uart_init();
+	uart_init_debug();
     stdout = &uart_output;
     stdin  = &uart_input;
 	
