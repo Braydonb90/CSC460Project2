@@ -1,6 +1,4 @@
-makefile
 setpath
-build
 *.o
 *.hex
 *.elf

@@ -475,13 +475,23 @@ void Task_Terminate()
 void Ping() 
 {
   int  x ;
-  BIT_SET(DDRA, 6);
+  BIT_SET(DDRA, 0);
   for(;;){
 
 	//LED off
+<<<<<<< HEAD
     BIT_TOGGLE(PORTA, 6);
     _delay_ms(400);
 
+=======
+    //BIT_RESET(PORTB, 6);
+    BIT_SET(PORTA, 0);
+    _delay_ms(500);
+
+    BIT_RESET(PORTA, 0);
+    _delay_ms(500);
+	  
+>>>>>>> e782bd166b323e3cdb8a4b89bead686334237286
     /* printf( "*" );  */
     if(VOLUNTARY)
         Task_Next();
@@ -496,7 +506,7 @@ void Ping()
 void Pong() 
 {
   int  x;
-  BIT_SET(DDRB, 6);
+  BIT_SET(DDRA, 1);
   for(;;) {
 	//LED on
     BIT_TOGGLE(PORTB, 6);
