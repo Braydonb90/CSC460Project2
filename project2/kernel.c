@@ -97,6 +97,7 @@ volatile static PD* Cp;
  * Requests aren't always associated with a task, so need to have this
  */
 static KERNEL_REQUEST_PARAM* current_request;
+static KERNEL_REQUEST_PARAM  current_request_copy;
 
 /* 
  * Since this is a "full-served" model, the kernel is executing using its own
@@ -143,7 +144,7 @@ char* Get_State(short s) {
 		case BLOCKED_SEND:		return "BLOCKED_SEND";
 		case BLOCKED_RECEIVE:	return "BLOCKED_RECEIVE";
 		case BLOCKED_REPLY:		return "BLOCKED_REPLY";
-		default:				return ""+s;
+		default:				return "NOT FOUND";
 	}
 }
 
@@ -157,7 +158,7 @@ char* Get_Request_Type(short s) {
 		case SEND:		return "SEND";
 		case RECEIVE:	return "RECEIVE";
 		case REPLY:		return "REPLY";
-		default:		return ""+s;
+		default:		return "NOT FOUND";
 	}
 }
 
@@ -258,6 +259,7 @@ static void Kernel_Create_Task()
  */
 static void Dispatch()
 {
+    if(DEBUG) puts("dispatch\n");
 
     if(Cp != NULL){
 		//put current process back in queue, if relevant
@@ -302,11 +304,12 @@ static void Dispatch()
     //find new process 
     if (system_q.length > 0) {
         Cp = Q_Pop_Ready(&system_q);
-        if(Cp == NULL) {
+       /* if(Cp == NULL) {
+            // This shouldnt be queue error now
             OS_Abort(QUEUE_ERROR);
-        }
+        }*/
     }
-    else if(periodic_q.length > 0) {
+    if(Cp == NULL && periodic_q.length > 0) {
         int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
 
         if(r_count > 1){
@@ -316,7 +319,8 @@ static void Dispatch()
             Cp = Q_Pop(&periodic_q);
             Cp->next_start = Elapsed;
         }
-    } else if(rr_q.length > 0) {
+    }
+    if(Cp == NULL && rr_q.length > 0) {
         Cp = Q_Pop_Ready(&rr_q);
     }
     
@@ -334,6 +338,7 @@ static void Dispatch()
 /*
  * This is the main loop of our kernel, called by Kernel_Start().
  */
+ int num_next = 0;
 static void Kernel_Next_Request() 
 {
     Dispatch();  /* select a new task to run */
@@ -348,13 +353,15 @@ static void Kernel_Next_Request()
         /* if this task makes a system call, it will return to here! */
 
         /* save the Cp's stack pointer */
+        if(DEBUG) printf("Kernel_Next_Request Info:\nType: %d | Priority: %d\n", 
+                                        current_request->request_type, current_request->priority);
         Cp->sp = CurrentSp;
         if(current_request == NULL) {
             OS_Abort(NULL_REQUEST);
         }
         if(do_break)
             debug_break(3,1,2,1);
-        switch(current_request->request_type){
+        switch(current_request_copy.request_type){
             case CREATE:
                 Kernel_Create_Task();
                 break;
@@ -363,6 +370,8 @@ static void Kernel_Next_Request()
                     Cp->next_start = Cp->next_start + Cp->period;
                     Cp->state = READY;
                 }
+                num_next++;
+                if(DEBUG) printf("Next calls: %d\n", num_next);
                 Cp->state = READY;
                 Dispatch();
                 break;
@@ -383,9 +392,14 @@ static void Kernel_Next_Request()
                         OS_Abort(PERIODIC_OVERUSE);
                     }
                 }
+                else {
+                    if(DEBUG) printf("system_q: %d\nperiodic_q: %d\nrr_q: %d\n\nCp priority: %d\nCp PID: %d\n", 
+                                system_q.length, periodic_q.length, rr_q.length,
+                                Cp->priority, Cp->pid);
+                }
                 break;
-		case SEND:
-				printf("SEND\n");
+            case SEND:
+				if(DEBUG) printf("SEND\n");
 				if(Cp->priority == PERIODIC) {
 					OS_Abort(INVALID_MSG_SEND_REQUEST);
 				}
@@ -393,7 +407,7 @@ static void Kernel_Next_Request()
 				Dispatch();
 				break;
 			case RECEIVE:
-				printf("Receive Mask: %d\n", current_request->msg_detail.mask);
+				if(DEBUG) printf("Receive Mask: %d\n", current_request->msg_detail.mask);
 				if(Cp->priority == PERIODIC) {
 					OS_Abort(INVALID_MSG_RECEIVE_REQUEST);
 				}
@@ -401,7 +415,7 @@ static void Kernel_Next_Request()
 				Dispatch();
 				break;
 			case REPLY:
-				printf("Reply\n");
+				if(DEBUG) printf("Reply\n");
 				if(Cp->priority == PERIODIC) {
 					OS_Abort(INVALID_MSG_REPLY_REQUEST);
 				}
@@ -410,10 +424,13 @@ static void Kernel_Next_Request()
 				break;
             default:
                 /* Houston! we have a problem here! */
+                if(DEBUG) printf("request type: %d\n", current_request_copy.request_type);
                 OS_Abort(INVALID_REQUEST);
                 break;
         }
         current_request = NULL;
+
+        if(DEBUG) printf("exiting kernel\ncurrent_request=%d\n", current_request);
     } 
 }
 
@@ -438,10 +455,10 @@ static void Kernel_Request_Msg_Send(){
 					for(x = 0; x < MAXTHREAD; x++) { // Check to see if any messages are blocked by receive
 					
 						if(Process[x].state == BLOCKED_RECEIVE) {
-							printf("Found: %d\n", Process[x].pid);
-							printf("Message: %d\n", Cp->msg_detail.pid);
-							printf("Mask: %d\n", (Process[x].msg_detail.mask));
-							printf("Type: %d\n",  Cp->msg_detail.type);
+							if(DEBUG) printf("Found: %d\n", Process[x].pid);
+							if(DEBUG) printf("Message: %d\n", Cp->msg_detail.pid);
+							if(DEBUG) printf("Mask: %d\n", (Process[x].msg_detail.mask));
+							if(DEBUG) printf("Type: %d\n",  Cp->msg_detail.type);
 							
 							if(Process[x].pid == Cp->msg_detail.pid && (Process[x].msg_detail.mask & Cp->msg_detail.type))
 							{
@@ -502,6 +519,7 @@ void Kernel_Request(KERNEL_REQUEST_PARAM* krp) {
         Disable_Interrupt();
         Cp->request_param = *krp;
         current_request = krp;
+        current_request_copy = *krp;
 
         Enter_Kernel();
     }
@@ -524,8 +542,14 @@ static void Setup_System_Clock()
     //Set prescaler to 256 (16000000 / 256 = 62500)
     TCCR4B |= (1<<CS42);
 
-    //Set TOP value (0.01 seconds)
-    OCR4A = (int)(62500 * ((float)MSECPERTICK / 1000));
+    // Set TOP value (0.01 seconds)
+    // OCR register is 16 bit, so max value is 65536
+    // So we'll have our max period as 1 sec
+    unsigned int per_tick = 62500 * ((MSECPERTICK>1000)? 1000 : MSECPERTICK) / 1000;
+
+    if(DEBUG) printf("ms per system tick: %u\nclock ticks per system tick: %u\n", MSECPERTICK, per_tick); 
+    _delay_ms(2000);
+    OCR4A = per_tick;
 
     //Enable interupt A for timer 4.
     TIMSK4 |= (1<<OCIE4A);
@@ -538,9 +562,11 @@ static void Setup_System_Clock()
 /*
  * Called once every system tick
  */
+static KERNEL_REQUEST_PARAM prm;
 ISR(TIMER4_COMPA_vect)
 {
     if (KernelActive) {
+        if(DEBUG) puts("-------- START TICK ---------\n");
         BIT_TOGGLE(OUTPUT_PORT, CLOCK_PIN);
 		Elapsed++;
 		
@@ -550,11 +576,14 @@ ISR(TIMER4_COMPA_vect)
         // but if there is????
         // Shouldn't be possible, as any request should immediately disable interrupts
         if(current_request != NULL) {
+            if(DEBUG) printf("current_request=%d\n",current_request);
             OS_Abort(NON_NULL_REQUEST);
         }
-        KERNEL_REQUEST_PARAM prm;
         prm.request_type = TIMER_TICK; 
+        prm.priority = SYSTEM;
+        current_request_copy = prm;
 
+        //Is this going out of scope???
         Kernel_Request(&prm);
     }
         
@@ -617,12 +646,10 @@ void Kernel_Init()
 void Kernel_Start() 
 {   
     if ( (! KernelActive) && (Tasks > 0)) {
-        //Idle task shouldn't be counted, as it doesn't take a slot in the PD array
-        Tasks = 0;
         Disable_Interrupt();
 
         /* here we go...  */
-        KernelActive = 1;
+        KernelActive = TRUE;
         Kernel_Next_Request();
         /* NEVER RETURNS!!! */
      }
@@ -646,8 +673,6 @@ void main()
 	uart_init();
     stdout = &uart_output;
     stdin  = &uart_input;
-	
-	printf("Test\n");
 	
     Kernel_Init();
     Setup_System_Clock();

@@ -28,7 +28,6 @@ typedef struct ProcessDescriptor
     TICK wcet;
     TICK period;
     TICK offset;
-	
 } PD;
 
 typedef struct ProcessQueue {

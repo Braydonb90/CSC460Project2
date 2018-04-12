@@ -162,6 +162,8 @@ typedef struct kernel_request_param
 #define TRUE          1
 #define FALSE         0
 
+#define DEBUG         0
+
 #define ANY           0xFF       // a mask for ALL message type
 
 /**********************/

@@ -13,7 +13,7 @@
 
 #define TEST_SYSTEM
 #define TEST_RR
-//#define TEST_PERIODIC
+#define TEST_PERIODIC
 //#define TEST_PID_CREATE
 
 

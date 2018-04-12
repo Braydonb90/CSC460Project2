@@ -17,7 +17,7 @@
 # default_serial = "avrdoper"
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
-TTYS = COM12
+TTYS = /dev/ttyACM0
 DEVICE = atmega2560
 CLOCK = 16000000
 CONFIG = -C ./avrdude.conf

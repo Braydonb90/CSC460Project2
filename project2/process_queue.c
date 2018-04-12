@@ -17,7 +17,9 @@ ProcessQ* Q_Init(ProcessQ* q, PRIORITY type){
  * for RR and system tasks
  */
 void Q_Push(ProcessQ* q, PD* pd) {
-    
+    if(DEBUG) puts("|\n|\n");
+    if(DEBUG) printf("Q Push\n");
+    print_queue(q); 
 	pd->next = NULL;
     if (q->length == 0) {
         q->front = pd;
@@ -27,10 +29,13 @@ void Q_Push(ProcessQ* q, PD* pd) {
     }
     q->back = pd;
     q->length++;
+    if(DEBUG) printf("Push %d\n", pd->pid);
+    if(DEBUG) puts("|\n|\n");
 }
 
 PD* Q_Pop_Ready(ProcessQ* q) {
-	printf("Pop Ready\n");
+    if(DEBUG) puts("|\n|\n");
+	if(DEBUG) printf("Q Pop Ready\n");
 	print_queue(q);
 	
 	PD* prev = NULL;
@@ -55,10 +60,11 @@ PD* Q_Pop_Ready(ProcessQ* q) {
 		cur = cur->next;
 	}
 	if(cur != NULL) {
-		printf("Pop %d\n", cur->pid);
+		if(DEBUG) printf("Pop %d\n", cur->pid);
 	} else {
-		printf("Pop nothing\n");
+		if(DEBUG) printf("Pop nothing\n");
 	}
+    if(DEBUG) puts("|\n|\n");
 	return cur;
 }
 
@@ -101,20 +107,22 @@ PD* Q_Pop_Ready_OLD(ProcessQ* q) {
 }
 
 void print_queue(ProcessQ* q) {
-	printf("print_queue\n"); 
 	int i = 0;
 	PD* cur = q->front;
 	while(cur != NULL){
-		printf("Queue index %d\n", i);  
-		printf("Cur: %d ; state: %s\n", cur->pid, Get_State(cur->state));
+		if(DEBUG) printf("----- Index %d -----\n", i);  
+		if(DEBUG) printf("PID: %d | state: %d | priority: %d", cur->pid, cur->state, cur->priority);
 		i++;
         cur = cur->next;
 		if(cur != NULL){
-			printf("Next: %d\n", cur->pid);
+			if(DEBUG) printf(" | next: %d\n", cur->pid);
 		}
+        else {
+            if(DEBUG) puts(" | next: NULL\n");
+        }
     }  
-	printf("Queue size %d\n", i);  
-	printf("Queue length %d\n", q->length);  
+	if(DEBUG) printf("Queue size %d\n", i);  
+	if(DEBUG) printf("Queue length %d\n", q->length);  
 }
 /*
  * Regular pop
@@ -136,6 +144,9 @@ PD* Q_Peek(ProcessQ* q){
  * inserts at the appropriate point in the q
  */
 void Q_Insert(ProcessQ* q, PD* pd) {
+    if(DEBUG) puts("|\n|\n");
+    if(DEBUG) printf("Q Insert\n");
+    print_queue(q);
     if (q->length == 0) {
         pd->next = NULL;
         q->front = pd;
@@ -177,6 +188,7 @@ void Q_Insert(ProcessQ* q, PD* pd) {
             q->length++;
         }
     }
+    if(DEBUG) puts("|\n|\n");
 }
 unsigned int Q_CountScheduledTasks(ProcessQ* q, unsigned int elapsed){
     int count = 0;
