@@ -30,6 +30,9 @@ void Q_Push(ProcessQ* q, PD* pd) {
     if(DEBUG) puts("|\n|\n");
 }
 
+/*
+ * Cycles through Q, returning the first READY task
+ */
 PD* Q_Pop_Ready(ProcessQ* q) {
     if(DEBUG) puts("|\n|\n");
 	if(DEBUG) printf("Q Pop Ready\n");
@@ -63,44 +66,6 @@ PD* Q_Pop_Ready(ProcessQ* q) {
 	}
     if(DEBUG) puts("|\n|\n");
 	return cur;
-}
-
-/*
- * Cycles through Q, returning the first READY task
- */
-PD* Q_Pop_Ready_OLD(ProcessQ* q) {
-    int len = q->length,i;
-    PD* prev = q->front;
-    PD* cur = prev->next;
-    //in case the front is actually ready
-    if(prev->state == READY){
-        //cur should be null here???
-        if(q->front == q->back){
-            if(cur != NULL){
-                OS_Abort(NON_NULL_Q_BACK);
-            }
-            q->back = cur;
-        }
-        q->front = cur;
-        q->length--;
-        return prev;
-    }
-    //otherwise
-    while(cur != NULL){
-        if(cur->state == READY){
-            if(cur == q->back){
-                q->back = prev;
-            }
-            prev->next = cur->next;
-            cur->next = NULL;
-            q->length--;
-            return cur;
-        }
-        prev = cur;
-        cur = cur->next;
-    }
-            
-    return NULL;
 }
 
 void print_queue(ProcessQ* q) {

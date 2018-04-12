@@ -158,7 +158,7 @@ void user_main() {
     int p2 = Task_Create_RR(Task_Pong_RR, 0); 
 #endif
 int start_p5 = 0;
-int start_p6 = 1;
+int start_p6 = 50;
 #ifdef TEST_SYSTEM
     int arg_p3 = 8;
     int arg_p4 = 5;
