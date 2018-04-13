@@ -6,7 +6,8 @@
  */
 
 #include <util/delay.h>
-#include "../os/common.h"
+#include <math.h>
+#include "../os/os.h"
 #include "roomba.h"
 #include "roomba_sci.h"
 
@@ -19,12 +20,17 @@ LED_STATE spot = LED_OFF;
 LED_STATE clean = LED_OFF;
 LED_STATE max = LED_OFF;
 LED_STATE dd = LED_OFF;
-uint8_t power_colour = 128;		// green
+
+uint8_t power_colour = POWER_RED;		// red
 uint8_t power_intensity = 255;	// full intensity
 
 ROOMBA_STATE state = SAFE_MODE;
+MOVE_STATE m_state = STAND_MODE;
+
 
 static void update_leds();
+
+
 
 void Roomba_Init()
 {
@@ -68,11 +74,7 @@ void Roomba_Init()
 	// put the Roomba into safe mode.
 	uart2_putc(CONTROL);
 	_delay_ms(20);
-
-	// Set the Roomba's LEDs to the defaults defined above (to verify defaults).
-	//update_leds();
-	Roomba_Drive(100, 32768);
-	printf("Roomba_Init finish\n");
+	printf("Roomba_Init complete\n");
 }
 
 /**
@@ -81,68 +83,70 @@ void Roomba_Init()
  * function doesn't enter an infinite loop if a byte is missed.  You'll have to modify this function
  * and insert it into Roomba_UpdateSensorPacket to suit your application.
  */
-/*
+
 uint8_t wait_for_bytes(uint8_t num_bytes, uint8_t timeout)
 {
 	uint16_t start;
 	start = Now();	// current system time
-	while (Now() - start < timeout && uart_bytes_received() != num_bytes);
-	if (uart_bytes_received() >= num_bytes)
-		return 1;
+	while (Now() - start < timeout && uart2_bytes_received() < num_bytes);
+	if (uart2_bytes_received() >= num_bytes)
+		return TRUE;
 	else
-		return 0;
-}*/
-/*
+		return FALSE;
+}
+
 void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* sensor_packet)
 {
-	// No, I don't feel bad about manual loop unrolling.
+	uart2_reset_receive();
 	uart2_putc(SENSORS);
 	uart2_putc(group);
 	switch(group)
 	{
 	case EXTERNAL:
 		// environment sensors
-		while (uart_bytes_received() != 10);
-		sensor_packet->bumps_wheeldrops = uart_get_byte(0);
-		sensor_packet->wall = uart_get_byte(1);
-		sensor_packet->cliff_left = uart_get_byte(2);
-		sensor_packet->cliff_front_left = uart_get_byte(3);
-		sensor_packet->cliff_front_right = uart_get_byte(4);
-		sensor_packet->cliff_right = uart_get_byte(5);
-		sensor_packet->virtual_wall = uart_get_byte(6);
-		sensor_packet->motor_overcurrents = uart_get_byte(7);
-		sensor_packet->dirt_left = uart_get_byte(8);
-		sensor_packet->dirt_right = uart_get_byte(9);
+		if(wait_for_bytes(10, 50) == FALSE) {printf("Failed\n"); break;}
+		//while (uart_bytes_received() != 10);
+		sensor_packet->bumps_wheeldrops = uart2_get_byte(0);
+		sensor_packet->wall = uart2_get_byte(1);
+		sensor_packet->cliff_left = uart2_get_byte(2);
+		sensor_packet->cliff_front_left = uart2_get_byte(3);
+		sensor_packet->cliff_front_right = uart2_get_byte(4);
+		sensor_packet->cliff_right = uart2_get_byte(5);
+		sensor_packet->virtual_wall = uart2_get_byte(6);
+		sensor_packet->motor_overcurrents = uart2_get_byte(7);
+		sensor_packet->dirt_left = uart2_get_byte(8);
+		sensor_packet->dirt_right = uart2_get_byte(9);
 		break;
 	case CHASSIS:
 		// chassis sensors
-		while (uart_bytes_received() != 6);
-		sensor_packet->remote_opcode = uart_get_byte(0);
-		sensor_packet->buttons = uart_get_byte(1);
-		sensor_packet->distance.bytes.high_byte = uart_get_byte(2);
-		sensor_packet->distance.bytes.low_byte = uart_get_byte(3);
-		sensor_packet->angle.bytes.high_byte = uart_get_byte(4);
-		sensor_packet->angle.bytes.low_byte = uart_get_byte(5);
+		if(wait_for_bytes(6, 50) == FALSE) break;
+		//while (uart_bytes_received() != 6);
+		sensor_packet->remote_opcode = uart2_get_byte(0);
+		sensor_packet->buttons = uart2_get_byte(1);
+		sensor_packet->distance.bytes.high_byte = uart2_get_byte(2);
+		sensor_packet->distance.bytes.low_byte = uart2_get_byte(3);
+		sensor_packet->angle.bytes.high_byte = uart2_get_byte(4);
+		sensor_packet->angle.bytes.low_byte = uart2_get_byte(5);
 		break;
 	case INTERNAL:
 		// internal sensors
-		while (uart_bytes_received() != 10);
-		sensor_packet->charging_state = uart_get_byte(0);
-		sensor_packet->voltage.bytes.high_byte = uart_get_byte(1);
-		sensor_packet->voltage.bytes.low_byte = uart_get_byte(2);
-		sensor_packet->current.bytes.high_byte = uart_get_byte(3);
-		sensor_packet->current.bytes.low_byte = uart_get_byte(4);
-		sensor_packet->temperature = uart_get_byte(5);
-		sensor_packet->charge.bytes.high_byte = uart_get_byte(6);
-		sensor_packet->charge.bytes.low_byte = uart_get_byte(7);
-		sensor_packet->capacity.bytes.high_byte = uart_get_byte(8);
-		sensor_packet->capacity.bytes.low_byte = uart_get_byte(9);
+		if(wait_for_bytes(10, 50) == FALSE) break;
+		//while (uart_bytes_received() != 10);
+		sensor_packet->charging_state = uart2_get_byte(0);
+		sensor_packet->voltage.bytes.high_byte = uart2_get_byte(1);
+		sensor_packet->voltage.bytes.low_byte = uart2_get_byte(2);
+		sensor_packet->current.bytes.high_byte = uart2_get_byte(3);
+		sensor_packet->current.bytes.low_byte = uart2_get_byte(4);
+		sensor_packet->temperature = uart2_get_byte(5);
+		sensor_packet->charge.bytes.high_byte = uart2_get_byte(6);
+		sensor_packet->charge.bytes.low_byte = uart2_get_byte(7);
+		sensor_packet->capacity.bytes.high_byte = uart2_get_byte(8);
+		sensor_packet->capacity.bytes.low_byte = uart2_get_byte(9);
 		break;
 	}
-	uart_reset_receive();
+	uart2_reset_receive();
 }
 
-*/
 void Roomba_ChangeState(ROOMBA_STATE newState)
 {
 	if (newState == SAFE_MODE)
@@ -171,9 +175,17 @@ void Roomba_ChangeState(ROOMBA_STATE newState)
 	_delay_ms(20);
 }
 
+
 void Roomba_Drive( int16_t velocity, int16_t radius )
 {
 	uart2_putc(DRIVE);
+	
+	if(m_state == STAND_MODE) 
+	{
+		velocity = 0;
+		radius = (radius > 0) ? 1 : -1;
+	}
+	
 	uart2_putc(HIGH_BYTE(velocity));
 	uart2_putc(LOW_BYTE(velocity));
 	uart2_putc(HIGH_BYTE(radius));
@@ -252,9 +264,21 @@ void Roomba_PlaySong(int songNum)
 	uart2_putc(songNum);
 }
 
+void Roomba_ChangeDriveState() 
+{
+	m_state = (m_state == CRUISE_MODE) ? STAND_MODE : CRUISE_MODE;
+	Roomba_ConfigPowerLED((m_state == CRUISE_MODE) ? POWER_RED : POWER_BLUE, 255);
+}
+
 uint8_t Roomba_BumperActivated(roomba_sensor_data_t* sensor_data)
 {
 	// if either of the bumper bits is set, then return true.
 	return (sensor_data->bumps_wheeldrops & 0x03) != 0;
+}
+
+uint8_t Roomba_RiverHit(roomba_sensor_data_t* sensor_data)
+{
+	// if virtual wall is set, then return true.
+	return (sensor_data->virtual_wall) == 1;
 }
 
