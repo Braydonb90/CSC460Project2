@@ -665,43 +665,13 @@ void Kernel_Idle_Task() {
     }
 }
 
-void analog_init() {
-    // Set prescaler to 128 (125kHz)
-    BIT_SET(ADCSRA, ADPS2);
-    BIT_SET(ADCSRA, ADPS1);
-    BIT_SET(ADCSRA, ADPS0);
-
-    // Set ADC reference voltage
-    BIT_SET(ADMUX, REFS0);
-
-    // Left align ADC value, so that entire value is contained in ADCH
-    BIT_SET(ADMUX, ADLAR);
-
-    // Enable ADC
-    BIT_SET(ADCSRA, ADEN);
-    
-    // Start Conversion
-    BIT_SET(ADCSRA, ADSC);
-}
-void analog_read(uint8_t pin) {
-    // clear mux bits 0-4
-    ADMUX &= 0xE0;
-    
-    // set channel (mask it so we dont overwrite shit)
-    ADMUX |= (7 & channel);
-    
-}
-
-
-    
 
 void main() 
 {
-	uart_init();
+	uart_init_debug();
     stdout = &uart_output;
     stdin  = &uart_input;
     
-	
     Kernel_Init();
     Setup_System_Clock();
     Kernel_Start();
