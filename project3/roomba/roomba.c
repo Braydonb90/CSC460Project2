@@ -6,7 +6,7 @@
  */
 
 #include <util/delay.h>
-#include "../os/uart.h"
+#include "roomba_uart.h"
 #include "../os/common.h"
 #include "roomba.h"
 #include "roomba_sci.h"
@@ -20,7 +20,7 @@ LED_STATE spot = LED_OFF;
 LED_STATE clean = LED_OFF;
 LED_STATE max = LED_OFF;
 LED_STATE dd = LED_OFF;
-uint8_t power_colour = 0;		// green
+uint8_t power_colour = 128;		// green
 uint8_t power_intensity = 255;	// full intensity
 
 ROOMBA_STATE state = SAFE_MODE;
@@ -31,48 +31,46 @@ void Roomba_Init()
 {
 	printf("Roomba_Init\n");
 	uint8_t i;
-	DD_DDR |= _BV(DD_PIN);
+	BIT_SET(DD_DDR, DD_PIN);
+			
 	// Wake up the Roomba by driving the DD pin low for 500 ms.
-	DD_PORT &= ~_BV(DD_PIN);
+	BIT_RESET(DD_PORT, DD_PIN);
 	_delay_ms(500);
-	DD_PORT |= _BV(DD_PIN);
+	BIT_SET(DD_PORT, DD_PIN);
 
 	// Wait for 2 seconds, Then pulse the DD pin 3 times to set the Roomba to operate at 19200 baud.
 	// This ensures that we know what baud rate to talk at.
 	_delay_ms(2000);
 	for (i = 0; i < 3; i++)
 	{
-		DD_PORT &= ~_BV(DD_PIN);
-		_delay_ms(50);
-		DD_PORT |= _BV(DD_PIN);
-		_delay_ms(50);
+		BIT_RESET(DD_PORT, DD_PIN);
+		_delay_ms(250);
+		BIT_SET(DD_PORT, DD_PIN);
+		_delay_ms(250);
 	}
 
-	uart_init(UART_19200);
+	Roomba_UART_Init(UART_19200);
 
 	// start the Roomba's SCI
-	uart_putchar(START);
+	Roomba_Send_Byte(START);
 	_delay_ms(20);
+	
+	
 
-	// See the appropriate AVR hardware specification, at the end of the USART section, for a table of baud rate
-	// framing error probabilities.  The best we can do with a 16 or 8 MHz crystal is 38400 bps, which has a framing
-	// error rate of 0.2% (1 bit out of every 500).  Well, the best is 76800 bps, but the Roomba doesn't support
-	// that.  38400 at 0.2% is sufficient for our purposes.  An 18.432 MHz crystal will generate all the Roomba's
-	// baud rates with 0.0% error!.  Anyway, the point is we want to use a 38400 bps baud rate to avoid framing
-	// errors.  Also, we have to wait for 100 ms after changing the baud rate.
-	uart_putchar(BAUD_RATE);
-	uart_putchar(ROOMBA_38400BPS);
+	Roomba_Send_Byte(BAUD_RATE);
+	Roomba_Send_Byte(ROOMBA_38400BPS);
 	_delay_ms(100);
 
 	// change the AVR's UART clock to the new baud rate.
-	uart_init(UART_38400);
+	Roomba_UART_Init(UART_38400);
 
 	// put the Roomba into safe mode.
-	uart_putchar(CONTROL);
+	Roomba_Send_Byte(CONTROL);
 	_delay_ms(20);
 
 	// Set the Roomba's LEDs to the defaults defined above (to verify defaults).
 	//update_leds();
+	Roomba_Drive(100, 32768);
 	printf("Roomba_Init finish\n");
 }
 
