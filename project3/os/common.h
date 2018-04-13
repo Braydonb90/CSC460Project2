@@ -120,6 +120,7 @@ typedef struct kernel_request_param
 
 #define BIT_RESET(PORT, PIN) (PORT &= ~(1<<PIN))
 #define BIT_SET(PORT, PIN)   (PORT |= (1<<PIN))
+#define BIT_READ(PORT, PIN)  ((PORT >> PIN) & 1)
 #define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
 #define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
 #define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
