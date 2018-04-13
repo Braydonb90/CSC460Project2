@@ -124,8 +124,6 @@ typedef struct kernel_request_param
 #define BIT_TOGGLE(PORT, PIN) (PORT ^= (1<<PIN))
 #define LOW_BYTE(X) (((uint16_t)X) & 0xFF)
 #define HIGH_BYTE(X) ((((uint16_t)X) >> 8) & 0xFF)
-#define Disable_Interrupt()		asm volatile ("cli"::)
-#define Enable_Interrupt()		asm volatile ("sei"::)
 
 /********************/
 

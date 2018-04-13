@@ -18,7 +18,6 @@ void Blink_Pin(unsigned int pin, unsigned int num){
 }
 
 void debug_break(int argcount, ...) {
-    Disable_Interrupt();
     if(argcount > 20) {
         while(TRUE);
     }

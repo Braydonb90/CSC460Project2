@@ -2,16 +2,19 @@
 #include "uart.h"
 /* http://www.ermicro.com/blog/?p=325 */
 
-const FILE uart_output = (FILE)FDEV_SETUP_STREAM(uart_putchar_debug, NULL, _FDEV_SETUP_WRITE);
-const FILE uart_input = (FILE)FDEV_SETUP_STREAM(NULL, uart_getchar_debug, _FDEV_SETUP_READ);
+FILE uart0_output = (FILE)FDEV_SETUP_STREAM(uart0_putc, NULL, _FDEV_SETUP_WRITE);
+FILE uart0_input = (FILE)FDEV_SETUP_STREAM(NULL, uart0_getc, _FDEV_SETUP_READ);
 
 /* http://www.cs.mun.ca/~rod/Winter2007/4723/notes/serial/serial.html */
 
 
-static volatile uint8_t uart_buffer[UART_BUFFER_SIZE];
-static volatile uint8_t uart_buffer_index;
+static volatile uint8_t uart1_buffer[UART_BUFFER_SIZE];
+static volatile uint8_t uart1_buffer_index;
 
-void uart_init_debug() {
+static volatile uint8_t uart2_buffer[UART_BUFFER_SIZE];
+static volatile uint8_t uart2_buffer_index;
+
+void uart0_init() {
 	
 	// For output debugging
 		#if USE_2X
@@ -23,48 +26,44 @@ void uart_init_debug() {
 		UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); /* 8-bit data */ 
 		UCSR0B = _BV(RXEN0) | _BV(TXEN0);   /* Enable RX and TX */    
 		
-		UBRR0H = UBRRH_VALUE;
-		UBRR0L = UBRRL_VALUE;
+		UBRR0 = MYBRR(9600);
 }
 
-void uart_init(UART_BPS bitrate) {
-    
-	
-	// For Bluetooth
-	UCSR1A = _BV(U2X1);
-	UCSR1B = _BV(RXEN1) | _BV(TXEN1) | _BV(RXCIE1);
-	UCSR1C = _BV(UCSZ11) | _BV(UCSZ10);
-
-	UBRR0H = 0;	// for any speed >= 9600 bps, the UBBR value fits in the low byte.
-	switch(bitrate) {
-		case UART_19200:
-			UBRR1L = 103;
-			break;
-		case UART_38400:
-			UBRR1L = 51;
-			break;
-		case UART_57600:
-			UBRR1L = 34;
-			break;
-		default:
-			UBRR1L = 103;
-	}
-    uart_buffer_index = 0;
-}
-
-
-void uart_putchar_debug(char c, FILE *stream) {
+void uart0_putc(char c, FILE *stream) {
     if (c == '\n') {
-        uart_putchar_debug('\r', stream);
+        uart0_putc('\r', stream);
     }
     loop_until_bit_is_set(UCSR0A, UDRE0);
     UDR0 = c;
 }
 
-char uart_getchar_debug(FILE *stream) {
+char uart0_getc(FILE *stream) {
     loop_until_bit_is_set(UCSR0A, RXC0);
     return UDR0;
 }
+
+void uart1_init(uint16_t ubrr_value) {
+    	
+	// For Roomba
+	UBRR1L = (uint8_t) ubrr_value;
+	UBRR1H = (ubrr_value>>8);
+	
+	UCSR1B = (1<<TXEN1)|(1<<RXEN1)|(1<<RXCIE1);
+	
+    uart1_buffer_index = 0;
+}
+
+void uart2_init(uint16_t ubrr_value) {
+    	
+	// For Roomba
+	UBRR2L = (uint8_t) ubrr_value;
+	UBRR2H = (ubrr_value>>8);
+	
+	UCSR2B = (1<<TXEN2)|(1<<RXEN2)|(1<<RXCIE2);
+	
+    uart2_buffer_index = 0;
+}
+
 
 
 /**
@@ -73,13 +72,24 @@ char uart_getchar_debug(FILE *stream) {
  *
  * @param byte data to trasmit
  */
-void uart_putchar(uint8_t byte)
+void uart1_putc(char byte)
 {
     /* wait for empty transmit buffer */
-    while (!( UCSR1A & (1 << UDRE1)));
+    //while (!( UCSR1A & (UDRE1)));
+	while (!( UCSR1A & (1 << UDRE1)));
 
     /* Put data into buffer, sends the data */
     UDR1 = byte;
+}
+
+void uart2_putc(char byte)
+{
+    /* wait for empty transmit buffer */
+    //while (!( UCSR1A & (UDRE1)));
+	while (!( UCSR2A & (1 << UDRE2)));
+
+    /* Put data into buffer, sends the data */
+    UDR2 = byte;
 }
 
 /**
@@ -89,11 +99,20 @@ void uart_putchar(uint8_t byte)
  *
  * @return
  */
-uint8_t uart_get_byte(int index)
+uint8_t uart1_get_byte(int index)
 {
     if (index < UART_BUFFER_SIZE)
     {
-        return uart_buffer[index];
+        return uart1_buffer[index];
+    }
+    return 0;
+}
+
+uint8_t uart2_get_byte(int index)
+{
+    if (index < UART_BUFFER_SIZE)
+    {
+        return uart2_buffer[index];
     }
     return 0;
 }
@@ -103,18 +122,28 @@ uint8_t uart_get_byte(int index)
  *
  * @return number of bytes received on UART
  */
-uint8_t uart_bytes_received(void)
+uint8_t uart1_bytes_received(void)
 {
-    return uart_buffer_index;
+    return uart1_buffer_index;
+}
+
+uint8_t uart2_bytes_received(void)
+{
+    return uart2_buffer_index;
 }
 
 /**
  * Prepares UART to receive another payload
  *
  */
-void uart_reset_receive(void)
+void uart1_reset_receive(void)
 {
-    uart_buffer_index = 0;
+    uart1_buffer_index = 0;
+}
+
+void uart2_reset_receive(void)
+{
+    uart2_buffer_index = 0;
 }
 
 /**
@@ -122,19 +151,36 @@ void uart_reset_receive(void)
  */
 ISR(USART1_RX_vect)
 {
+	printf("USART1_RX_vect\n");
 	while(!(UCSR1A & (1<<RXC1)));
-    uart_buffer[uart_buffer_index] = UDR1;
-    uart_buffer_index = (uart_buffer_index + 1) % UART_BUFFER_SIZE;
+    uart1_buffer[uart1_buffer_index] = UDR1;
+    uart1_buffer_index = (uart1_buffer_index + 1) % UART_BUFFER_SIZE;
 }
 
-void uart_print(uint8_t* output, int size)
+ISR(USART2_RX_vect)
+{
+	printf("USART2_RX_vect\n");
+	while(!(UCSR2A & (1<<RXC2)));
+    uart2_buffer[uart2_buffer_index] = UDR2;
+    uart2_buffer_index = (uart2_buffer_index + 1) % UART_BUFFER_SIZE;
+}
+
+void uart1_print(uint8_t* output, int size)
 {
 	uint8_t i;
 	for (i = 0; i < size && output[i] != 0; i++)
 	{
-		uart_putchar(output[i]);
+		uart1_putc(output[i]);
 	}
 }
 
+void uart2_print(uint8_t* output, int size)
+{
+	uint8_t i;
+	for (i = 0; i < size && output[i] != 0; i++)
+	{
+		uart2_putc(output[i]);
+	}
+}
 
 

@@ -6,6 +6,9 @@
 #include "process_queue.h"
 #include "os.h"
 
+#define Disable_Interrupt()		asm volatile ("cli"::)
+#define Enable_Interrupt()		asm volatile ("sei"::)
+
 TICK Kernel_GetElapsed();
 
 /*
