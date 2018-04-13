@@ -5,6 +5,11 @@
 #include "roomba_sci.h"
 #include "sensor_struct.h"
 
+
+#define POWER_GREEN  0
+#define POWER_RED  128
+#define POWER_BLUE  255
+
 typedef enum _rsg
 {
         EXTERNAL=1,             // group 1 (bumper/wheeldrops, cliff sensors, virtual wall, motor overcurrents, dirt sensors)
@@ -19,11 +24,21 @@ typedef enum _rstate
 	FULL_MODE,
 } ROOMBA_STATE;
 
+typedef enum _mstate
+{
+	CRUISE_MODE,
+	STAND_MODE
+} MOVE_STATE;
+
 /**
  * Turn on the Roomba with the serial port DD pin, configure the SCI to operate at 38400 baud, put the Roomba into safe mode,
  * and configure the LEDs to their default values.
  */
-void Roomba_Init();
+void Roomba_Init(void);
+
+uint8_t Roomba_BumperActivated(roomba_sensor_data_t* sensor_data);
+uint8_t Roomba_RiverHit(roomba_sensor_data_t* sensor_data);
+void Roomba_ChangeDriveState(void);
 
 /**
  * Retrieve a section of the Roomba's sensor data and copy it into a sensor packet structure.

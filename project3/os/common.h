@@ -170,6 +170,5 @@ typedef struct kernel_request_param
 #define ANY           0xFF       // a mask for ALL message type
 
 /**********************/
-extern BOOL do_break;
 
 #endif

@@ -112,16 +112,14 @@ void Q_Insert(ProcessQ* q, PD* pd) {
     if(DEBUG) puts("|\n|\n");
     if(DEBUG) printf("Q Insert\n");
     if(DEBUG) print_queue(q);
+	pd->next = NULL;
     if (q->length == 0) {
-        pd->next = NULL;
         q->front = pd;
         q->back = pd;
-        q->length++;
     }
     else if(pd->next_start < q->front->next_start){
         pd->next = q->front;
         q->front = pd;
-        q->length++;
     }
     else {
         PD* prev = q->front;
@@ -130,10 +128,6 @@ void Q_Insert(ProcessQ* q, PD* pd) {
         PD* spot = NULL;
 	    	
 		while(cur != NULL) {
-            if(do_break){
-                BIT_SET(SYSTEM_PORT_INIT,0);
-                BIT_SET(SYSTEM_PORT, 0);
-            }
 			if(pd->next_start < cur->next_start) {
                 spot =  prev;
                 break;
@@ -144,15 +138,13 @@ void Q_Insert(ProcessQ* q, PD* pd) {
         if(spot == NULL){
             q->back->next = pd;
             q->back = pd;
-            q->back->next = NULL;
-            q->length++;
         }
         else{
-            pd->next = spot;
+			pd->next = spot->next;
             spot->next = pd;
-            q->length++;
         }
     }
+    q->length++;
     if(DEBUG) puts("|\n|\n");
 }
 unsigned int Q_CountScheduledTasks(ProcessQ* q, unsigned int elapsed){

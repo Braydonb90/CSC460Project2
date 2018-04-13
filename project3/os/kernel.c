@@ -134,7 +134,6 @@ static ProcessQ system_q;
 static ProcessQ rr_q;
 
 BOOL idling;
-BOOL do_break = FALSE;
 
 char* Get_State(short s) {
 	switch(s) {
@@ -236,8 +235,6 @@ static void Kernel_Create_Task()
 				Process[x].period = current_request->period;
 				Process[x].next_start = Elapsed + current_request->offset;
 				Process[x].state = READY;
-                if(periodic_q.length == 2)
-                    do_break = TRUE;
                 Q_Insert(&periodic_q, Process + x);
                 break;
             case RR:
@@ -311,7 +308,7 @@ static void Dispatch()
     }
     if(Cp == NULL && periodic_q.length > 0) {
         int r_count = Q_CountScheduledTasks(&periodic_q, Elapsed);
-
+	
         if(r_count > 1){
             OS_Abort(TIMING_VIOLATION);
         }
@@ -358,8 +355,7 @@ static void Kernel_Next_Request()
         if(current_request == NULL) {
             OS_Abort(NULL_REQUEST);
         }
-        if(do_break)
-            debug_break(3,1,2,1);
+		
         switch(current_request_copy.request_type){
             case CREATE:
                 Kernel_Create_Task();
@@ -367,10 +363,8 @@ static void Kernel_Next_Request()
             case NEXT:
                 if(Cp->priority == PERIODIC) {
                     Cp->next_start = Cp->next_start + Cp->period;
-                    Cp->state = READY;
                 }
                 num_next++;
-                if(DEBUG) printf("Next calls: %d\n", num_next);
                 Cp->state = READY;
                 Dispatch();
                 break;
@@ -567,7 +561,8 @@ ISR(TIMER4_COMPA_vect)
     if (KernelActive) {
         if(DEBUG) puts("-------- START TICK ---------\n");
         BIT_TOGGLE(OUTPUT_PORT, CLOCK_PIN);
-		Elapsed++;
+		if(Cp == NULL || Cp->priority != SYSTEM)
+			Elapsed++;
 		
         // Need to indicate that this is just a tick, for the likely case that 
         // the Cp doesn't need to get switched
@@ -671,6 +666,7 @@ void main()
 	uart0_init();
     stdout = &uart0_output;
     stdin  = &uart0_input;
+	printf("Kernel Main\n");
 	
 	//uart0_init(BAUD_CALC(9600));
 	//stdout = &uart0_io; // attach uart stream to stdout & stdin
