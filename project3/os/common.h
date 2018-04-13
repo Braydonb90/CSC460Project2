@@ -154,6 +154,10 @@ typedef struct kernel_request_param
 #define RR_PORT_INIT DDRL
 #define RR_PORT PORTL
 
+//Analog on Port F ==> (PinA0 == PF0) to (PinA7 == PF7)
+#define ANALOG_PORT_INIT DDRF
+#define ANALOG_PORT PORTF
+
 #ifndef NULL
 #define NULL          0   /* undefined */
 #endif

@@ -1,4 +1,4 @@
-source setpath
+source ~/school/rtos/setpath
 cp makefile ./makefile.bkp
 sed -i 's/COM[0-9]*/\/dev\/ttyACM0/g' makefile
 make clean

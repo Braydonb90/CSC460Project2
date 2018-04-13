@@ -547,7 +547,7 @@ static void Setup_System_Clock()
     unsigned int per_tick = 62500 * ((MSECPERTICK>1000)? 1000 : MSECPERTICK) / 1000;
 
     if(DEBUG) printf("ms per system tick: %u\nclock ticks per system tick: %u\n", MSECPERTICK, per_tick); 
-    _delay_ms(2000);
+    if(DEBUG) _delay_ms(2000);
     OCR4A = per_tick;
 
     //Enable interupt A for timer 4.
@@ -665,12 +665,42 @@ void Kernel_Idle_Task() {
     }
 }
 
+void analog_init() {
+    // Set prescaler to 128 (125kHz)
+    BIT_SET(ADCSRA, ADPS2);
+    BIT_SET(ADCSRA, ADPS1);
+    BIT_SET(ADCSRA, ADPS0);
+
+    // Set ADC reference voltage
+    BIT_SET(ADMUX, REFS0);
+
+    // Left align ADC value, so that entire value is contained in ADCH
+    BIT_SET(ADMUX, ADLAR);
+
+    // Enable ADC
+    BIT_SET(ADCSRA, ADEN);
+    
+    // Start Conversion
+    BIT_SET(ADCSRA, ADSC);
+}
+void analog_read(uint8_t pin) {
+    // clear mux bits 0-4
+    ADMUX &= 0xE0;
+    
+    // set channel (mask it so we dont overwrite shit)
+    ADMUX |= (7 & channel);
+    
+}
+
+
+    
 
 void main() 
 {
-	uart_init_debug();
+	uart_init();
     stdout = &uart_output;
     stdin  = &uart_input;
+    
 	
     Kernel_Init();
     Setup_System_Clock();
