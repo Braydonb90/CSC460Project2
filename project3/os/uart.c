@@ -151,7 +151,6 @@ void uart2_reset_receive(void)
  */
 ISR(USART1_RX_vect)
 {
-	printf("USART1_RX_vect\n");
 	while(!(UCSR1A & (1<<RXC1)));
     uart1_buffer[uart1_buffer_index] = UDR1;
     uart1_buffer_index = (uart1_buffer_index + 1) % UART_BUFFER_SIZE;
@@ -159,7 +158,6 @@ ISR(USART1_RX_vect)
 
 ISR(USART2_RX_vect)
 {
-	printf("USART2_RX_vect\n");
 	while(!(UCSR2A & (1<<RXC2)));
     uart2_buffer[uart2_buffer_index] = UDR2;
     uart2_buffer_index = (uart2_buffer_index + 1) % UART_BUFFER_SIZE;
