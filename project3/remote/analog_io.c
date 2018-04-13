@@ -86,11 +86,6 @@ void joystick_init() {
 
 static long map(long x, long in_min, long in_max, long out_min, long out_max)
 {
-    //printf("params: %ld, %ld, %ld, %ld, %ld\n", x, in_min, in_max, out_min, out_max);
-    long t1 = x- in_min;
-    long t2 = out_max - out_min;
-    long t3 = in_max - in_min;
-    //printf("%ld * %ld / %ld + %ld= %ld\n", t1,t2,t3, out_min, t1*t2/t3 + out_min);
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 static int constrain(int in, int min, int max) {
@@ -134,37 +129,6 @@ uint8_t query_joystick_z(int num) {
     else {
         return BIT_READ(PINA, PINZ1);
     }
-}
-void test_servo(){
-    int pos, posx, posy;
-    float period = 5000;
-    float t_step = period / 180;
-    puts("-------- SERVO TEST --------");
-    for (pos = 0; pos <= 180; pos++) {
-      posx =  map(pos, 0, 180, PANMIN, PANMAX);  
-      posy =  map(pos, 0, 180, TILTMIN, TILTMAX);  
-      servo_set_tilt(posy);  
-      servo_set_pan(posx); 
-      _delay_ms(t_step);   
-    }
-    puts("-----------");
-    for (pos = 180; pos > 0; pos--) { 
-      posx =  map(pos, 0, 180, PANMIN, PANMAX);  
-      posy =  map(pos, 0, 180, TILTMIN, TILTMAX);  
-      servo_set_tilt(posy);  
-      servo_set_pan(posx);     
-      _delay_ms(t_step);  
-    }
-    //back to center
-    puts("-----------");
-    for (pos = 0; pos < 90; pos++){
-      posx =  map(pos, 0, 180, PANMIN, PANMAX);  
-      posy =  map(pos, 0, 180, TILTMIN, TILTMAX);  
-      servo_set_tilt(posy);  
-      servo_set_pan(posx);     
-      _delay_ms(t_step);  
-    }
-    puts("-------- FINISHED ---------");
 }
 
 //Pin2

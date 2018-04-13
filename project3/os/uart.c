@@ -4,6 +4,8 @@
 
 FILE uart0_output = (FILE)FDEV_SETUP_STREAM(uart0_putc, NULL, _FDEV_SETUP_WRITE);
 FILE uart0_input = (FILE)FDEV_SETUP_STREAM(NULL, uart0_getc, _FDEV_SETUP_READ);
+FILE uart1_output = (FILE)FDEV_SETUP_STREAM(uart1_putc_stream, NULL, _FDEV_SETUP_WRITE);
+FILE uart1_input = (FILE)FDEV_SETUP_STREAM(NULL, uart1_getc_stream, _FDEV_SETUP_WRITE);
 
 /* http://www.cs.mun.ca/~rod/Winter2007/4723/notes/serial/serial.html */
 
@@ -81,6 +83,18 @@ void uart1_putc(char byte)
     /* Put data into buffer, sends the data */
     UDR1 = byte;
 }
+void uart1_putc_stream(char c, FILE *stream) {
+    if (c == '\n') {
+        uart0_putc('\r', stream);
+    }
+    loop_until_bit_is_set(UCSR0A, UDRE0);
+    UDR0 = c;
+}
+
+char uart1_getc_stream(FILE *stream) {
+    loop_until_bit_is_set(UCSR0A, RXC0);
+    return UDR0;
+}
 
 void uart2_putc(char byte)
 {
@@ -151,7 +165,7 @@ void uart2_reset_receive(void)
  */
 ISR(USART1_RX_vect)
 {
-	printf("USART1_RX_vect\n");
+//	printf("USART1_RX_vect\n");
 	while(!(UCSR1A & (1<<RXC1)));
     uart1_buffer[uart1_buffer_index] = UDR1;
     uart1_buffer_index = (uart1_buffer_index + 1) % UART_BUFFER_SIZE;
@@ -159,7 +173,7 @@ ISR(USART1_RX_vect)
 
 ISR(USART2_RX_vect)
 {
-	printf("USART2_RX_vect\n");
+//	printf("USART2_RX_vect\n");
 	while(!(UCSR2A & (1<<RXC2)));
     uart2_buffer[uart2_buffer_index] = UDR2;
     uart2_buffer_index = (uart2_buffer_index + 1) % UART_BUFFER_SIZE;
