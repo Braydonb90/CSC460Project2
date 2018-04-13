@@ -6,7 +6,6 @@
  */
 
 #include <util/delay.h>
-#include "roomba_uart.h"
 #include "../os/common.h"
 #include "roomba.h"
 #include "roomba_sci.h"
@@ -49,23 +48,25 @@ void Roomba_Init()
 		_delay_ms(250);
 	}
 
-	Roomba_UART_Init(UART_19200);
-
+	//Roomba_UART_Init(UART_19200);
+	uart2_init(BAUD_CALC(19200));
+	//asm volatile ("sei"::);
+	
 	// start the Roomba's SCI
-	Roomba_Send_Byte(START);
+	uart2_putc(START);
 	_delay_ms(20);
 	
 	
 
-	Roomba_Send_Byte(BAUD_RATE);
-	Roomba_Send_Byte(ROOMBA_38400BPS);
+	uart2_putc(BAUD_RATE);
+	uart2_putc(ROOMBA_38400BPS);
 	_delay_ms(100);
 
 	// change the AVR's UART clock to the new baud rate.
-	Roomba_UART_Init(UART_38400);
+	uart2_init(BAUD_CALC(38400));
 
 	// put the Roomba into safe mode.
-	Roomba_Send_Byte(CONTROL);
+	uart2_putc(CONTROL);
 	_delay_ms(20);
 
 	// Set the Roomba's LEDs to the defaults defined above (to verify defaults).
@@ -91,12 +92,12 @@ uint8_t wait_for_bytes(uint8_t num_bytes, uint8_t timeout)
 	else
 		return 0;
 }*/
-
+/*
 void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* sensor_packet)
 {
 	// No, I don't feel bad about manual loop unrolling.
-	uart_putchar(SENSORS);
-	uart_putchar(group);
+	uart2_putc(SENSORS);
+	uart2_putc(group);
 	switch(group)
 	{
 	case EXTERNAL:
@@ -141,24 +142,24 @@ void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* 
 	uart_reset_receive();
 }
 
-
+*/
 void Roomba_ChangeState(ROOMBA_STATE newState)
 {
 	if (newState == SAFE_MODE)
 	{
 		if (state == PASSIVE_MODE)
-			uart_putchar(CONTROL);
+			uart2_putc(CONTROL);
 		else if (state == FULL_MODE)
-			uart_putchar(SAFE);
+			uart2_putc(SAFE);
 	}
 	else if (newState == FULL_MODE)
 	{
 		Roomba_ChangeState(SAFE_MODE);
-		uart_putchar(FULL);
+		uart2_putc(FULL);
 	}
 	else if (newState == PASSIVE_MODE)
 	{
-		uart_putchar(POWER);
+		uart2_putc(POWER);
 	}
 	else
 	{
@@ -172,11 +173,11 @@ void Roomba_ChangeState(ROOMBA_STATE newState)
 
 void Roomba_Drive( int16_t velocity, int16_t radius )
 {
-	uart_putchar(DRIVE);
-	uart_putchar(HIGH_BYTE(velocity));
-	uart_putchar(LOW_BYTE(velocity));
-	uart_putchar(HIGH_BYTE(radius));
-	uart_putchar(LOW_BYTE(radius));
+	uart2_putc(DRIVE);
+	uart2_putc(HIGH_BYTE(velocity));
+	uart2_putc(LOW_BYTE(velocity));
+	uart2_putc(HIGH_BYTE(radius));
+	uart2_putc(LOW_BYTE(radius));
 }
 
 /**
@@ -187,10 +188,10 @@ void update_leds()
 	// The status, spot, clean, max, and dirt detect LED states are combined in a single byte.
 	uint8_t leds = status << 4 | spot << 3 | clean << 2 | max << 1 | dd;
 
-	uart_putchar(LEDS);
-	uart_putchar(leds);
-	uart_putchar(power_colour);
-	uart_putchar(power_intensity);
+	uart2_putc(LEDS);
+	uart2_putc(leds);
+	uart2_putc(power_colour);
+	uart2_putc(power_intensity);
 }
 
 void Roomba_ConfigPowerLED(uint8_t colour, uint8_t intensity)
@@ -234,21 +235,21 @@ void Roomba_LoadSong(uint8_t songNum, uint8_t* notes, uint8_t* notelengths, uint
 {
 	uint8_t i = 0;
 
-	uart_putchar(SONG);
-	uart_putchar(songNum);
-	uart_putchar(numNotes);
+	uart2_putc(SONG);
+	uart2_putc(songNum);
+	uart2_putc(numNotes);
 
 	for (i=0; i<numNotes; i++)
 	{
-		uart_putchar(notes[i]);
-		uart_putchar(notelengths[i]);
+		uart2_putc(notes[i]);
+		uart2_putc(notelengths[i]);
 	}
 }
 
 void Roomba_PlaySong(int songNum)
 {
-	uart_putchar(PLAY);
-	uart_putchar(songNum);
+	uart2_putc(PLAY);
+	uart2_putc(songNum);
 }
 
 uint8_t Roomba_BumperActivated(roomba_sensor_data_t* sensor_data)

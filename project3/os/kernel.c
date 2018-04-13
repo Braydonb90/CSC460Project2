@@ -668,9 +668,14 @@ void Kernel_Idle_Task() {
 
 void main() 
 {
-	uart_init_debug();
-    stdout = &uart_output;
-    stdin  = &uart_input;
+	uart0_init();
+    stdout = &uart0_output;
+    stdin  = &uart0_input;
+	
+	//uart0_init(BAUD_CALC(9600));
+	//stdout = &uart0_io; // attach uart stream to stdout & stdin
+	//stdin = &uart0_io; // uart0_in and uart0_out are only available if NO_USART_RX or NO_USART_TX is defined
+	
     
     Kernel_Init();
     Setup_System_Clock();
