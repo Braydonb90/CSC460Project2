@@ -17,12 +17,12 @@
 # default_serial = "avrdoper"
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
-TTYS = COM12
+TTYS = COM16
 DEVICE = atmega2560
 CLOCK = 16000000
 CONFIG = -C ../avrdude.conf
 PROGRAMMER = -c wiring -P $(TTYS) -b 115200 -D
-OBJECTS = ../os/cswitch.o ../os/kernel.o ../os/os.o ../os/process_queue.o ../os/output.o ../os/uart.o main.o roomba.o
+OBJECTS = ../os/cswitch.o ../os/kernel.o ../os/os.o ../os/process_queue.o ../os/output.o ../os/uart.o main.o roomba.o analog_io.o
 FUSES	= -U lfuse:w:0xff:m	-U hfuse:w:0xd8:m	-U efuse:w:0xFD:m
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):

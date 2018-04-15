@@ -46,7 +46,7 @@ char uart0_getc(FILE *stream) {
 
 void uart1_init(uint16_t ubrr_value) {
     	
-	// For Roomba
+	// For Bluetooth
 	UBRR1L = (uint8_t) ubrr_value;
 	UBRR1H = (ubrr_value>>8);
 	

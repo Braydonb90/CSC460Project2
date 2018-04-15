@@ -1,2 +1,2 @@
 call make flash
-PuTTY.exe -serial COM12
+PuTTY.exe -serial COM16

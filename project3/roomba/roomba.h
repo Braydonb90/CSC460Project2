@@ -39,6 +39,7 @@ void Roomba_Init(void);
 uint8_t Roomba_BumperActivated(roomba_sensor_data_t* sensor_data);
 uint8_t Roomba_RiverHit(roomba_sensor_data_t* sensor_data);
 void Roomba_ChangeDriveState(void);
+uint8_t wait_for_bytes(uint8_t num_bytes, uint8_t timeout);
 
 /**
  * Retrieve a section of the Roomba's sensor data and copy it into a sensor packet structure.
@@ -101,6 +102,7 @@ void Roomba_UpdateSensorPacket(ROOMBA_SENSOR_GROUP group, roomba_sensor_data_t* 
  * 		a control loop on the controller and an external angle sensor (such as a compass or accelerometer) to provide feedback.
  */
 void Roomba_Drive( int16_t velocity, int16_t radius );
+void Roomba_D_Drive(int16_t left, int16_t right);
 
 /**
  * Change the Roomba's state to passive mode, safe mode, or full mode.  The Roomba_Init function puts the Roomba into safe mode.

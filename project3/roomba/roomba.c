@@ -175,6 +175,14 @@ void Roomba_ChangeState(ROOMBA_STATE newState)
 	_delay_ms(20);
 }
 
+void Roomba_D_Drive(int16_t left, int16_t right)
+{
+	uart2_putc(D_DRIVE);
+	uart2_putc(HIGH_BYTE(left));
+	uart2_putc(LOW_BYTE(left));
+	uart2_putc(HIGH_BYTE(right));
+	uart2_putc(LOW_BYTE(right));
+}
 
 void Roomba_Drive( int16_t velocity, int16_t radius )
 {
