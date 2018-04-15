@@ -19,9 +19,6 @@ void analog_init() {
     
     // Start Conversion
     BIT_SET(ADCSRA, ADSC);
-
-    // Use entire PORTC as analog input
-    PORTC = 0xFF;
 }
 
 // Read analog value at pin
@@ -71,8 +68,9 @@ void servo_init() {
     OCR3C = (TILTMAX-TILTMIN)/2;
 }
 
-int pos_x;
-int pos_y;
+int pos_x[2];
+int pos_y[2];
+uint8_t laser_state;
 
 void joystick_init() {
     //Set Z pins to pull-up input
@@ -80,8 +78,12 @@ void joystick_init() {
     BIT_RESET(DDRA, PINZ1);
     BIT_SET(PORTA, PINZ0);
     BIT_SET(PORTA, PINZ1);
-    pos_x = (PANMAX - PANMIN) / 2;
-    pos_y = (TILTMAX - TILTMIN) / 2;
+
+    pos_x[0] = 128;
+    pos_y[0] = 128;
+    laser_state = 0;
+    pos_x[1] = 128;
+    pos_y[1] = 128;
 }
 
 static long map(long x, long in_min, long in_max, long out_min, long out_max)
@@ -105,47 +107,91 @@ static int apply_deadband(int val) {
 uint8_t query_joystick_x(int num) {
     int val;
     if(num == 0) {
-        val = analog_read(PINX0); 
+        val = apply_deadband(analog_read(PINX0));
     }
     else {
-        val = analog_read(PINX1);
+        val = apply_deadband(analog_read(PINX1));
     }
-    return apply_deadband(val);
+    pos_x[num] = val;
+    return val;
 }
 uint8_t query_joystick_y(int num) {
     int val;
     if(num == 0) {
-        val = analog_read(PINY0);
+
+
     }
     else {
-        val = analog_read(PINY1);
+        val = apply_deadband(analog_read(PINY1));
     }
-    return apply_deadband(val);
+    pos_y[num] = val;
+    return val;
 }
+int released = 1;
 uint8_t query_joystick_z(int num) {
     if(num == 0) {
-        return BIT_READ(PINA, PINZ0);
+        uint8_t val = BIT_READ(PINA, PINZ0);
+        if(val == 0 && released == 1) {
+            released = 0;
+            laser_state = !laser_state;
+        }
+        else if(released == 0  && val == 1) {
+            released = 1;
+        }
+        return val;
     }
-    else {
+    else {  //prob not used???
         return BIT_READ(PINA, PINZ1);
     }
+}
+uint8_t get_laserstate() {
+    return laser_state;
 }
 
 //Pin2
 void servo_set_pan(uint8_t pos) {
     pos = apply_deadband(pos);
     int diff = map(pos, 0, 255, -MAXDIFF, MAXDIFF);
-    pos_x += diff;
-    pos_x = constrain(pos_x, PANMIN,PANMAX);
-    OCR3B = pos_x;
+    pos_x[0] += diff;
+    pos_x[0] = constrain(pos_x[0], PANMIN,PANMAX);
+    OCR3B = pos_x[0];
 }
 
 //Pin3
 void servo_set_tilt(uint8_t pos) {
     pos = apply_deadband(pos);
     int diff = map(pos, 0, 255, -MAXDIFF, MAXDIFF);
-    pos_y += diff;
-    pos_y = constrain(pos_y, TILTMIN,TILTMAX);
-    OCR3C = pos_y;
+    pos_y[0] += diff;
+    pos_y[0] = constrain(pos_y[0], TILTMIN,TILTMAX);
+    OCR3C = pos_y[0];
+}
+
+//Should maybe add marker values for start and end
+//Packet Contents:
+//  Byte0:  pos_x[0] (joystick0 pos)
+//  Byte1:  pos_y[0] (joystick0 pos)
+//  Byte2:  laser state 
+//  Byte3:  pos_x[1] (joystick1 pos)
+//  Byte4:  pos_y[1] (joystick1 pos)
+
+void send_packet() {
+    int packet_size = 6;
+    uint8_t buff[packet_size];
+    
+    buff[0] = 255;
+    buff[1] = constrain(pos_x[0], 0, 254);
+    buff[2] = constrain(pos_y[0], 0, 254);
+    buff[3] = laser_state;
+    buff[4] = constrain(pos_x[1], 0, 254);
+    buff[5] = constrain(pos_y[1], 0, 254);
+    printf("-------------\n1 %d\n2 %d\n3 %d\n4 %d\n5 %d\n-------------\n",buff[1],buff[2],buff[3],buff[4], buff[5]);
+    uart1_print(buff, packet_size);
+}
+
+//Unpack packet values
+void update_values(uint8_t* packet) {
+    servo_set_pan(packet[0]);
+    servo_set_tilt(packet[1]);
+    laser_state = packet[2];
 }
 

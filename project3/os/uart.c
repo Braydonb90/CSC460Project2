@@ -85,15 +85,15 @@ void uart1_putc(char byte)
 }
 void uart1_putc_stream(char c, FILE *stream) {
     if (c == '\n') {
-        uart0_putc('\r', stream);
+        uart1_putc_stream('\r', stream);
     }
-    loop_until_bit_is_set(UCSR0A, UDRE0);
-    UDR0 = c;
+    loop_until_bit_is_set(UCSR1A, UDRE1);
+    UDR1 = c;
 }
 
 char uart1_getc_stream(FILE *stream) {
-    loop_until_bit_is_set(UCSR0A, RXC0);
-    return UDR0;
+    loop_until_bit_is_set(UCSR1A, RXC1);
+    return UDR1;
 }
 
 void uart2_putc(char byte)
@@ -180,7 +180,7 @@ ISR(USART2_RX_vect)
 void uart1_print(uint8_t* output, int size)
 {
 	uint8_t i;
-	for (i = 0; i < size && output[i] != 0; i++)
+	for (i = 0; i < size; i++)
 	{
 		uart1_putc(output[i]);
 	}
