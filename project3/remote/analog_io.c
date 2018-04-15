@@ -19,9 +19,6 @@ void analog_init() {
     
     // Start Conversion
     BIT_SET(ADCSRA, ADSC);
-
-    // Use entire PORTC as analog input
-    PORTC = 0xFF;
 }
 
 // Read analog value at pin
