@@ -28,5 +28,6 @@ void joystick_init();
 uint8_t query_joystick_x(int num);
 uint8_t query_joystick_y(int num);
 uint8_t query_joystick_z(int num);
+uint8_t get_laserstate();
 void servo_set_pan(uint8_t pos);
 void servo_set_tilt(uint8_t pos);

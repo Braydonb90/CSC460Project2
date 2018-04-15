@@ -4,10 +4,8 @@
 #include "analog_io.h"
 #include <util/delay.h>
 
-#define XPIN 0
-#define YPIN 1
-
 void query_joystick() {
+    int since_last_print = 0;
     int since_last_send = 0;
     int i;
     int buff_size = 20;
@@ -16,12 +14,20 @@ void query_joystick() {
     //shouldnt this macro be called in uart1_init?
     uart1_init(BAUD_CALC(9600));
     for(;;) {
-        query_joystick_x(0);
-        query_joystick_y(0);
-        query_joystick_z(0);
-        
-        if(since_last_send > 500) {
-            puts("sending packet");
+        if(since_last_print > 500) {
+            int x0 = query_joystick_x(0);
+            int y0 = query_joystick_y(0);
+            int z0 = query_joystick_z(0);
+            int x1 = query_joystick_x(1);
+            int y1 = query_joystick_y(1);
+            int z1 = query_joystick_z(1);
+            int ls = get_laserstate();
+            since_last_print = 0;
+        }
+        else {
+            since_last_print += 20;
+        }
+        if(since_last_send > 250) {
             send_packet();
             since_last_send = 0;
         }
